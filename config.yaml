@@ -1,0 +1,42 @@
+# UniswapV2 Data Fetcher Configuration
+# ======================================
+
+# Path to file containing Etherscan API keys (one per line)
+api_keys_file: "api_keys.txt"
+
+# Ethereum mainnet chain ID
+chain_id: 1
+
+# Output directory for CSV files
+output_dir: "data"
+
+# Checkpoint file for resume support
+checkpoint_file: "data/checkpoint.json"
+
+# Block range: leave both null for "maximize" mode (earliest to latest, use all keys until daily limits)
+# from_block: null       # null = use maximize_from_block
+# to_block: null         # null = latest block
+
+# When from_block is not set, start from this block (UniswapV2 factory deployment)
+maximize_from_block: 10000835
+
+# Adaptive block step size (will auto-adjust based on data density)
+block_step: 2000
+
+# Rate limiting (Free tier: 3 calls/sec, 100k/day per key)
+calls_per_second: 3
+daily_limit: 100000
+
+# Trading pairs to fetch
+# Each entry needs 'address' (pair contract) and 'name' (directory name)
+pairs:
+  - address: "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"
+    name: "WETH_USDC"
+  - address: "0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852"
+    name: "WETH_USDT"
+  - address: "0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11"
+    name: "WETH_DAI"
+  - address: "0xBb2b8038a1640196FbE3e38816F3e67Cba72D940"
+    name: "WETH_WBTC"
+  - address: "0x3041CbD36888bECc7bbCBc0045E3B1f144466f5f"
+    name: "USDC_USDT"
