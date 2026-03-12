@@ -1,3 +1,4 @@
 data/
 mev/
 v2-core/
+*.DS_Store*

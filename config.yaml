@@ -13,6 +13,9 @@ output_dir: "data"
 # Checkpoint file for resume support
 checkpoint_file: "data/checkpoint.json"
 
+# Warnings/errors (timeouts, rate limits) are written here; progress bar shows count in last 30s
+error_log_file: "data/error.log"
+
 # Block range: leave both null for "maximize" mode (earliest to latest, use all keys until daily limits)
 # from_block: null       # null = use maximize_from_block
 # to_block: null         # null = latest block
@@ -20,11 +23,14 @@ checkpoint_file: "data/checkpoint.json"
 # When from_block is not set, start from this block (UniswapV2 factory deployment)
 maximize_from_block: 10000835
 
-# Adaptive block step size (will auto-adjust based on data density)
-block_step: 2000
+# Initial block step (max aggressive; auto-adjust up to 80000)
+block_step: 25000
 
-# Rate limiting (Free tier: 3 calls/sec, 100k/day per key)
-calls_per_second: 3
+# Parallel workers: null = one thread per pair (recommended); or set e.g. 4
+workers: null
+
+# Rate limiting: use full quota (Free 3/sec 100k/day; Lite 5/sec 100k/day)
+calls_per_second: 5
 daily_limit: 100000
 
 # Trading pairs to fetch

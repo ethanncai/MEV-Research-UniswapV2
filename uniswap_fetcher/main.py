@@ -10,6 +10,7 @@ warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL")
 
 from .config import FetcherConfig, load_api_keys
 from .csv_writer import CSVWriter
+from .error_log import get_warning_count_last_30s, setup_error_log
 from .etherscan_client import EtherscanClient
 from .fetcher import CheckpointManager, LogFetcher, PairConfig
 from .rate_limiter import DailyLimitExhaustedError, RateLimiter
@@ -18,10 +19,13 @@ logger = logging.getLogger("uniswap_fetcher")
 
 
 def _setup_logging(verbose: bool) -> None:
-    """Configure root logger with console handler."""
-    level = logging.DEBUG if verbose else logging.INFO
+    """Configure logging. In non-verbose mode, console only shows CRITICAL (effectively progress only)."""
     fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=level, format=fmt, stream=sys.stderr)
+    if not verbose:
+        for h in logging.root.handlers:
+            h.setLevel(logging.CRITICAL)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -49,6 +53,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keys", default=None,
         help="Override path to API keys file.",
+    )
+    parser.add_argument(
+        "--static-step",
+        action="store_true",
+        help="Use a fixed block step (no adaptive growth/shrink); step = config block_step.",
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true",
@@ -81,19 +90,26 @@ def main() -> None:
     client = EtherscanClient(rate_limiter=limiter, chain_id=cfg.chain_id)
 
     if cfg.to_block is None:
-        logger.info("Querying latest block number...")
+        print("Querying latest block number...", file=sys.stderr)
         cfg.to_block = client.get_latest_block_number()
-        logger.info("Latest block: %d", cfg.to_block)
+        print(f"Latest block: {cfg.to_block}", file=sys.stderr)
 
-    # Default = maximize: fetch from earliest to latest, use all API keys until daily limits
     if cfg.from_block is None:
         cfg.from_block = cfg.maximize_from_block
-        logger.info(
-            "Maximize mode: from block %d to %d (using all %d key(s) until daily limits).",
-            cfg.from_block, cfg.to_block, limiter.total_keys,
+        print(
+            f"Maximize mode: from block {cfg.from_block} to {cfg.to_block} "
+            f"(using all {limiter.total_keys} key(s) until daily limits).",
+            file=sys.stderr,
         )
     else:
-        logger.info("Block range: %d to %d", cfg.from_block, cfg.to_block)
+        print(
+            f"Block range: {cfg.from_block} to {cfg.to_block} "
+            f"({limiter.total_keys} key(s)).",
+            file=sys.stderr,
+        )
+    print(f"Warnings/errors: {cfg.error_log_file}", file=sys.stderr)
+
+    setup_error_log(cfg.error_log_file)
 
     pairs = [
         PairConfig(address=p["address"], name=p["name"])
@@ -101,24 +117,47 @@ def main() -> None:
     ]
 
     checkpoint = CheckpointManager(cfg.checkpoint_file)
-    csv_writer = CSVWriter(cfg.output_dir)
+    if checkpoint.pair_count > 0:
+        print(f"Loaded checkpoint with {checkpoint.pair_count} pair(s).", file=sys.stderr)
+    print(
+        f"Starting fetch for {len(pairs)} pair(s), blocks {cfg.from_block} -> {cfg.to_block}.",
+        file=sys.stderr,
+    )
 
+    def on_pair_start(name: str, address: str) -> None:
+        print(f"--- Processing pair: {name} ({address}) ---", file=sys.stderr)
+
+    if args.static_step:
+        print("Using static step (no adaptive step).", file=sys.stderr)
+    csv_writer = CSVWriter(cfg.output_dir)
     fetcher = LogFetcher(
         client=client,
         csv_writer=csv_writer,
         checkpoint=checkpoint,
         block_step=cfg.block_step,
+        get_warning_count=get_warning_count_last_30s,
+        on_pair_start=on_pair_start,
+        static_step=args.static_step,
     )
-
-    try:
-        fetcher.fetch_all(pairs, cfg.from_block, cfg.to_block)
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user. Progress has been checkpointed.")
-    except DailyLimitExhaustedError as e:
-        logger.info(
-            "All API keys exhausted for today. Progress saved. Run again tomorrow or add more keys in api_keys.txt."
+    # Default workers = min(pairs, keys) so we don't have more threads than keys (no pointless blocking)
+    if cfg.workers is not None:
+        workers = cfg.workers
+    else:
+        workers = min(len(pairs), limiter.total_keys)
+    if workers > 1:
+        print(
+            f"Using {workers} workers for {len(pairs)} pair(s) ({limiter.total_keys} key(s)).",
+            file=sys.stderr,
         )
-        logger.debug("Limit error: %s", e)
+    try:
+        fetcher.fetch_all(pairs, cfg.from_block, cfg.to_block, workers=workers)
+    except KeyboardInterrupt:
+        print("Interrupted. Progress checkpointed.", file=sys.stderr)
+    except DailyLimitExhaustedError:
+        print(
+            "All API keys exhausted for today. Progress saved. Run again tomorrow or add more keys.",
+            file=sys.stderr,
+        )
     except Exception:
         logger.exception("Fatal error during fetch.")
         sys.exit(1)
@@ -126,12 +165,11 @@ def main() -> None:
         csv_writer.close()
         client.close()
 
-    logger.info("Done. Data saved to: %s", cfg.output_dir)
-
+    print(f"Done. Data: {cfg.output_dir}", file=sys.stderr)
     for stat in limiter.stats():
-        logger.info(
-            "Key ...%s: %d calls used, %d remaining.",
-            stat["key_suffix"], stat["calls_today"], stat["remaining"],
+        print(
+            f"  Key ...{stat['key_suffix']}: {stat['calls_today']} used, {stat['remaining']} left",
+            file=sys.stderr,
         )
 
 

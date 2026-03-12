@@ -1,6 +1,7 @@
-"""Multi-key token-bucket rate limiter for Etherscan API."""
+"""Multi-key token-bucket rate limiter for Etherscan API (thread-safe)."""
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -54,8 +55,9 @@ class RateLimiter:
         self._calls_per_second = calls_per_second
         self._daily_limit = daily_limit
         self._current_idx = 0
-        # Add 20% safety margin to avoid hitting rate limits
-        self._min_interval = 1.0 / calls_per_second * 1.2
+        self._lock = threading.Lock()
+        # Use full quota (no safety margin) for maximum throughput
+        self._min_interval = 1.0 / calls_per_second
 
     @property
     def total_keys(self) -> int:
@@ -80,31 +82,32 @@ class RateLimiter:
 
     def acquire(self) -> str:
         """Block until a call slot is available and return the API key to use.
+        Thread-safe: each key is used by at most one caller per min_interval.
 
         Raises:
             DailyLimitExhaustedError: If all keys have exhausted their daily budgets.
         """
-        ks = self._find_available_key()
-        if ks is None:
-            raise DailyLimitExhaustedError(
-                "All API keys have exhausted their daily call limits."
-            )
+        with self._lock:
+            ks = self._find_available_key()
+            if ks is None:
+                raise DailyLimitExhaustedError(
+                    "All API keys have exhausted their daily call limits."
+                )
+            now = time.monotonic()
+            wait_time = max(0.0, self._min_interval - (now - ks.last_call_ts))
+            ks.last_call_ts = now + wait_time
+            ks.calls_today += 1
+            if ks.calls_today % 10_000 == 0:
+                logger.info(
+                    "Key ...%s: %d / %d daily calls used.",
+                    ks.key[-6:], ks.calls_today, self._daily_limit,
+                )
+            self._current_idx = (self._current_idx + 1) % len(self._keys)
+            key = ks.key
 
-        elapsed = time.monotonic() - ks.last_call_ts
-        if elapsed < self._min_interval:
-            time.sleep(self._min_interval - elapsed)
-
-        ks.last_call_ts = time.monotonic()
-        ks.calls_today += 1
-
-        if ks.calls_today % 10_000 == 0:
-            logger.info(
-                "Key ...%s: %d / %d daily calls used.",
-                ks.key[-6:], ks.calls_today, self._daily_limit,
-            )
-
-        self._current_idx = (self._current_idx + 1) % len(self._keys)
-        return ks.key
+        if wait_time > 0:
+            time.sleep(wait_time)
+        return key
 
     def stats(self) -> list[dict]:
         """Return usage statistics for all keys."""

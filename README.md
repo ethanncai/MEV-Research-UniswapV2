@@ -104,6 +104,14 @@ python -m uniswap_fetcher.main --from-block 19000000 --to-block 19100000
 python -m uniswap_fetcher.main -c my_config.yaml --keys my_keys.txt
 ```
 
+### Static block step
+
+Use a fixed block step (no adaptive growth/shrink); step = `block_step` in config:
+
+```bash
+python -m uniswap_fetcher.main --static-step
+```
+
 ### Verbose logging
 
 ```bash
@@ -115,6 +123,8 @@ python -m uniswap_fetcher.main -v
 You can stop the run with `Ctrl+C`. Progress is saved in `data/checkpoint.json`; the next run continues from the last block for each pair.
 
 When **all API keys hit their daily limit**, the fetcher stops gracefully, saves progress, and exits. Run again the next day (or add more keys to `api_keys.txt`) to continue.
+
+**Console output**: By default only one startup line and the progress bar are shown; warnings and errors are written to `data/error.log`. The progress bar shows `warn_30s`: number of warnings in the last 30 seconds (e.g. timeouts, rate limits). Use `-v` for verbose logging to stderr.
 
 ---
 
@@ -137,12 +147,25 @@ For MEV analysis:
 
 ---
 
+## Parallel fetch: workers and keys
+
+The fetcher can run **multiple pairs in parallel** using a thread pool. Each thread runs one pair’s `fetch_pair` loop. Every API call goes through a **shared rate limiter** that assigns one API key per call and enforces **per-key** limits (calls/sec and daily quota). So at any moment there are at most **as many concurrent requests as you have keys**; extra threads block on `acquire()` until a key is free.
+
+- **Default workers** = `min(number of pairs, number of keys)`  
+  Example: 5 pairs and 4 keys → 4 workers. Four pairs are fetched in parallel; when one pair finishes, the same worker starts the fifth pair. This avoids having more threads than keys (no pointless blocking).
+
+- **Override workers** in `config.yaml` with `workers: N`. If you set `workers: 5` with 4 keys, 5 threads will run but only 4 can hold a key at once; the 5th thread will often wait on the limiter.
+
+- **Guarantee**: Each key is still rate-limited independently (calls/sec and daily limit), so no key is overused.
+
+---
+
 ## Rate limits
 
 - **Free**: 3 calls/sec, 100k calls/day per key.
 - **Lite**: 5 calls/sec, 100k calls/day per key (set `calls_per_second: 5` in `config.yaml` if you use Lite).
 
-The fetcher uses per-key rate limiting and daily counters, and rotates keys when one hits its daily limit. Transient “timeout / server busy” and rate-limit responses are retried with backoff.
+The fetcher uses per-key rate limiting and daily counters, and rotates keys when one hits its daily limit. Transient "timeout / server too busy" and rate-limit responses are retried with backoff.
 
 ---
 

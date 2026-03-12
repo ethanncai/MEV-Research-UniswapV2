@@ -2,10 +2,14 @@
 
 import json
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
+
+OptionalPairStartCallback = Optional[Callable[[str, str], None]]
 
 from tqdm import tqdm
 
@@ -16,10 +20,13 @@ from .models import TOPIC_TO_NAME
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BLOCK_STEP = 2000
-_MIN_BLOCK_STEP = 100
-_MAX_BLOCK_STEP = 10000
+_DEFAULT_BLOCK_STEP = 25000
+_MIN_BLOCK_STEP = 500
+_MAX_BLOCK_STEP = 80000
 _ETHERSCAN_MAX_RECORDS = 1000
+_SPARSE_THRESHOLD = 500   # below this: step *= 3.5
+_MEDIUM_THRESHOLD = 900   # below this: step *= 3; else step *= 2.5
+_SHRINK_FACTOR = 0.9     # on hit_limit: step *= this (minimal shrink)
 
 
 @dataclass
@@ -35,11 +42,12 @@ class PairConfig:
 # ---------------------------------------------------------------------------
 
 class CheckpointManager:
-    """Manages fetch progress checkpoints in a JSON file."""
+    """Manages fetch progress checkpoints in a JSON file (thread-safe)."""
 
     def __init__(self, filepath: Union[str, Path]) -> None:
         self._filepath = Path(filepath)
         self._data: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
         self._load()
 
     def _load(self) -> None:
@@ -50,17 +58,29 @@ class CheckpointManager:
                 "Loaded checkpoint with %d pair(s).", len(self._data),
             )
 
-    def save(self) -> None:
-        """Persist current checkpoint state to disk."""
+    def _save_unsafe(self) -> None:
+        """Write checkpoint to disk (caller must hold self._lock)."""
         self._filepath.parent.mkdir(parents=True, exist_ok=True)
         with open(self._filepath, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2)
 
+    def save(self) -> None:
+        """Persist current checkpoint state to disk."""
+        with self._lock:
+            self._save_unsafe()
+
+    @property
+    def pair_count(self) -> int:
+        """Return the number of pairs in the checkpoint."""
+        with self._lock:
+            return len(self._data)
+
     def get_last_block(self, pair_address: str) -> Optional[int]:
         """Return the last successfully fetched block for a pair, or None."""
-        entry = self._data.get(pair_address.lower())
-        if entry:
-            return entry.get("last_block")
+        with self._lock:
+            entry = self._data.get(pair_address.lower())
+            if entry:
+                return entry.get("last_block")
         return None
 
     def update(
@@ -71,19 +91,20 @@ class CheckpointManager:
         event_counts: dict[str, int],
     ) -> None:
         """Update checkpoint for a pair."""
-        key = pair_address.lower()
-        existing = self._data.get(key, {})
-        merged_counts = existing.get("event_counts", {})
-        for evt_name, cnt in event_counts.items():
-            merged_counts[evt_name] = merged_counts.get(evt_name, 0) + cnt
+        with self._lock:
+            key = pair_address.lower()
+            existing = self._data.get(key, {})
+            merged_counts = dict(existing.get("event_counts", {}))
+            for evt_name, cnt in event_counts.items():
+                merged_counts[evt_name] = merged_counts.get(evt_name, 0) + cnt
 
-        self._data[key] = {
-            "pair_name": pair_name,
-            "last_block": last_block,
-            "event_counts": merged_counts,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
-        }
-        self.save()
+            self._data[key] = {
+                "pair_name": pair_name,
+                "last_block": last_block,
+                "event_counts": merged_counts,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+            }
+            self._save_unsafe()
 
 
 # ---------------------------------------------------------------------------
@@ -99,11 +120,17 @@ class LogFetcher:
         csv_writer: CSVWriter,
         checkpoint: CheckpointManager,
         block_step: int = _DEFAULT_BLOCK_STEP,
+        get_warning_count: Optional[Callable[[], int]] = None,
+        on_pair_start: OptionalPairStartCallback = None,
+        static_step: bool = False,
     ) -> None:
         self._client = client
         self._writer = csv_writer
         self._checkpoint = checkpoint
         self._block_step = block_step
+        self._get_warning_count = get_warning_count
+        self._on_pair_start = on_pair_start
+        self._static_step = static_step
 
     def fetch_pair(
         self,
@@ -115,6 +142,8 @@ class LogFetcher:
 
         Automatically resumes from the last checkpoint if available.
         """
+        if self._on_pair_start:
+            self._on_pair_start(pair.name, pair.address)
         resume_block = self._checkpoint.get_last_block(pair.address)
         if resume_block is not None and resume_block >= from_block:
             actual_start = resume_block + 1
@@ -148,8 +177,10 @@ class LogFetcher:
                     pair.address, current, chunk_end,
                 )
 
-                if hit_limit:
-                    step = max(_MIN_BLOCK_STEP, step // 2)
+                # At minimum step (or static_step) we advance even if we hit 1000 records
+                at_min_step = step <= _MIN_BLOCK_STEP
+                if hit_limit and not at_min_step and not self._static_step:
+                    step = max(_MIN_BLOCK_STEP, int(step * _SHRINK_FACTOR))
                     logger.debug(
                         "Hit 1000-record limit, shrinking step to %d.", step,
                     )
@@ -161,20 +192,30 @@ class LogFetcher:
                     self._checkpoint.update(
                         pair.address, pair.name, chunk_end, event_counts,
                     )
-                    pbar.set_postfix(
-                        events=written, step=step, refresh=False,
-                    )
+                    postfix = {"events": written, "step": step}
                 else:
                     self._checkpoint.update(
                         pair.address, pair.name, chunk_end, {},
                     )
+                    postfix = {"step": step}
+                if self._get_warning_count:
+                    postfix["warn_30s"] = self._get_warning_count()
+                pbar.set_postfix(postfix, refresh=False)
 
                 advanced = chunk_end - current + 1
                 pbar.update(advanced)
                 current = chunk_end + 1
 
-                if not hit_limit and step < _MAX_BLOCK_STEP:
-                    step = min(_MAX_BLOCK_STEP, int(step * 1.5))
+                # Adaptive step (skip when static_step)
+                if not self._static_step:
+                    num_events = len(events) if events else 0
+                    if step < _MAX_BLOCK_STEP:
+                        if num_events < _SPARSE_THRESHOLD:
+                            step = min(_MAX_BLOCK_STEP, int(step * 3.5))
+                        elif num_events < _MEDIUM_THRESHOLD or step < _DEFAULT_BLOCK_STEP:
+                            step = min(_MAX_BLOCK_STEP, int(step * 3))
+                        else:
+                            step = min(_MAX_BLOCK_STEP, int(step * 2.5))
 
     def _fetch_block_range(
         self,
@@ -217,13 +258,24 @@ class LogFetcher:
         pairs: list[PairConfig],
         from_block: int,
         to_block: int,
+        workers: Optional[int] = None,
     ) -> None:
-        """Fetch events for all configured pairs sequentially."""
-        logger.info(
-            "Starting fetch for %d pair(s), blocks %d -> %d.",
-            len(pairs), from_block, to_block,
-        )
-        for pair in pairs:
-            logger.info("--- Processing pair: %s (%s) ---", pair.name, pair.address)
-            self.fetch_pair(pair, from_block, to_block)
-        logger.info("All pairs processed.")
+        """Fetch events for all pairs. If workers > 1, run pairs in parallel (one key per call, no per-key overuse)."""
+        if workers is None or workers <= 1:
+            for pair in pairs:
+                self.fetch_pair(pair, from_block, to_block)
+            return
+
+        n = min(workers, len(pairs))
+        with ThreadPoolExecutor(max_workers=n) as executor:
+            futures = {
+                executor.submit(self.fetch_pair, pair, from_block, to_block): pair
+                for pair in pairs
+            }
+            for fut in as_completed(futures):
+                pair = futures[fut]
+                try:
+                    fut.result()
+                except Exception:
+                    logger.exception("Pair %s failed", pair.name)
+                    raise

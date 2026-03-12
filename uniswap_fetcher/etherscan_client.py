@@ -11,8 +11,9 @@ from .rate_limiter import RateLimiter
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.etherscan.io/v2/api"
-_MAX_RETRIES = 5
-_RETRY_BACKOFF_BASE = 2.0
+_MAX_RETRIES = 8
+_RETRY_BACKOFF_BASE = 1.25  # faster retries: 1.25s, 1.56s, 1.95s, ...
+_DEFAULT_TIMEOUT = 45
 
 
 class EtherscanAPIError(Exception):
@@ -26,7 +27,7 @@ class EtherscanClient:
         self,
         rate_limiter: RateLimiter,
         chain_id: int = 1,
-        timeout: int = 30,
+        timeout: int = _DEFAULT_TIMEOUT,
     ) -> None:
         self._limiter = rate_limiter
         self._chain_id = chain_id

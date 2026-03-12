@@ -42,10 +42,12 @@ class FetcherConfig:
     chain_id: int = 1
     output_dir: str = "data"
     checkpoint_file: str = "data/checkpoint.json"
+    error_log_file: str = "data/error.log"
     from_block: Optional[int] = None
     to_block: Optional[int] = None
     maximize_from_block: int = 10_000_835  # UniswapV2 factory deployment
-    block_step: int = 2000
+    block_step: int = 25000
+    workers: Optional[int] = None  # None = one thread per pair (parallel)
     calls_per_second: int = 3
     daily_limit: int = 100_000
     pairs: list[dict[str, str]] = field(default_factory=lambda: list(DEFAULT_PAIRS))
@@ -68,10 +70,12 @@ class FetcherConfig:
             chain_id=raw.get("chain_id", cls.chain_id),
             output_dir=raw.get("output_dir", cls.output_dir),
             checkpoint_file=raw.get("checkpoint_file", cls.checkpoint_file),
+            error_log_file=raw.get("error_log_file", cls.error_log_file),
             from_block=raw.get("from_block"),
             to_block=raw.get("to_block"),
             maximize_from_block=raw.get("maximize_from_block", cls.maximize_from_block),
             block_step=raw.get("block_step", cls.block_step),
+            workers=raw.get("workers"),
             calls_per_second=raw.get("calls_per_second", cls.calls_per_second),
             daily_limit=raw.get("daily_limit", cls.daily_limit),
             pairs=raw.get("pairs", list(DEFAULT_PAIRS)),
