@@ -185,6 +185,12 @@ def detect_displacement(swaps_df, pair_name, gas_ratio_min=1.5, max_tx_gap=5):
                     continue
                 if abs(s1['tx_index'] - s2['tx_index']) > max_tx_gap:
                     continue
+                # Enforce that s1 executes strictly before s2 in the block.
+                # Without this check, the higher-gas tx might actually have a
+                # higher tx_index, meaning s1 is the victim, not the frontrunner.
+                if s1['tx_index'] >= s2['tx_index']:
+                    continue
+
                 gp1, gp2 = s1['gas_price'], s2['gas_price']
                 if gp2 <= 0 or gp1 <= 0:
                     continue
@@ -245,12 +251,12 @@ def detect_arbitrage(swaps_df, pair_name, max_tx_gap=3):
     d0, d1 = cfg['token0_decimals'], cfg['token1_decimals']
 
     df = df.copy()
+    # Trade size = the larger of the two token inputs (normalised by decimals).
+    # A swap only has one non-zero input side, so taking max(token0_in, token1_in)
+    # gives the actual amount sent in — no double-counting.
     df['trade_size'] = np.maximum(
         df['amount0_in'].astype(float) / (10 ** d0),
-        df['amount0_out'].astype(float) / (10 ** d0),
-    ) + np.maximum(
         df['amount1_in'].astype(float) / (10 ** d1),
-        df['amount1_out'].astype(float) / (10 ** d1),
     )
     large_threshold = df['trade_size'].quantile(0.90)
 

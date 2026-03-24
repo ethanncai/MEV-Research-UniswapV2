@@ -13,9 +13,12 @@ from config import PAIR_CONFIG, ESTIMATED_GAS_PER_SWAP, BTC_ETH_RATIO_APPROX
 def _get_eth_price(block_number, eth_price_idx):
     if eth_price_idx is None or eth_price_idx.empty:
         return 2000.0
-    idx = eth_price_idx.index.searchsorted(block_number)
-    if idx >= len(eth_price_idx):
-        idx = len(eth_price_idx) - 1
+    # searchsorted returns the insertion point (first index >= block_number).
+    # We want the last known price at or before block_number (floor / ffill),
+    # so we step back by one unless we landed exactly on the block.
+    idx = eth_price_idx.index.searchsorted(block_number, side='right') - 1
+    if idx < 0:
+        idx = 0
     return float(eth_price_idx.iloc[idx])
 
 

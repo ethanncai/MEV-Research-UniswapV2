@@ -32,11 +32,18 @@ def load_pair_data(pair_name):
 
     # direction 0 = token0 flows in (sell token0 / buy token1)
     # direction 1 = token1 flows in (sell token1 / buy token0)
+    cfg = PAIR_CONFIG[pair_name]
+    d0, d1 = cfg['token0_decimals'], cfg['token1_decimals']
+    # Fallback compares decimal-normalised amounts so that raw unit magnitude
+    # differences between tokens (e.g. 1e18 WETH vs 1e6 USDC) do not bias
+    # the direction assignment.
+    norm0_in = swaps['amount0_in'] / (10 ** d0)
+    norm1_in = swaps['amount1_in'] / (10 ** d1)
     swaps['direction'] = np.where(
         (swaps['amount0_in'] > 0) & (swaps['amount1_in'] == 0), 0,
         np.where(
             (swaps['amount1_in'] > 0) & (swaps['amount0_in'] == 0), 1,
-            np.where(swaps['amount0_in'] >= swaps['amount1_in'], 0, 1)
+            np.where(norm0_in >= norm1_in, 0, 1)
         )
     ).astype(int)
 
