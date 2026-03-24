@@ -1,5 +1,4 @@
 # MEV Frontrunning Analysis Report
-*Generated: 2026-03-18 18:50:26*
 
 ## 1. Executive Summary
 
@@ -18,7 +17,7 @@
 - Arbitrage net profit: **$10,889,739.32**
 - Unique sandwich attackers: **83**
 
-![Frontrunning Overview](01_frontrun_overview.png)
+![Frontrunning Overview](analysis/output/01_frontrun_overview.png)
 
 ## 2. Sandwich Attacks (Insertion)
 
@@ -52,9 +51,9 @@ A sandwich attack places a **front-run** trade before and a **back-run** trade a
 | `0x3bc1588f…514326` | 2 | $7,277.87 |
 | `0xf70a5d55…511b79` | 1 | $6,915.04 |
 
-![Sandwich Timeline](02_sandwich_timeline.png)
-![Profit Distribution](03_profit_distribution.png)
-![Top Attackers](04_top_attackers.png)
+![Sandwich Timeline](analysis/output/02_sandwich_timeline.png)
+![Profit Distribution](analysis/output/03_profit_distribution.png)
+![Top Attackers](analysis/output/04_top_attackers.png)
 
 ## 3. Displacement Frontrunning
 
@@ -74,7 +73,7 @@ Displacement occurs when a frontrunner observes a pending swap and submits their
 | `0x3fc91a3a…2b7fad` | 21 |
 | `0x80a64c6d…cd5d9e` | 20 |
 
-![Displacement](07_displacement.png)
+![Displacement](analysis/output/07_displacement.png)
 
 ## 4. Arbitrage / Back-running
 
@@ -94,7 +93,7 @@ Back-running occurs when an entity detects a large swap and immediately trades i
 | `0x51c72848…502a7f` | 141 |
 | `0x860bd2db…d78f66` | 120 |
 
-![Arbitrage](08_arbitrage.png)
+![Arbitrage](analysis/output/08_arbitrage.png)
 
 ## 5. Suppression
 
@@ -113,7 +112,7 @@ Suppression involves an entity flooding a block with **many high-gas transaction
 | `0x3328f7f4…309c49` | 1 |
 | `0x7c63795c…bcfde8` | 1 |
 
-![Suppression](09_suppression.png)
+![Suppression](analysis/output/09_suppression.png)
 
 ## 6. Gas Price Analysis
 
@@ -125,8 +124,8 @@ Suppression involves an entity flooding a block with **many high-gas transaction
 | WETH_WBTC | 47.00 Gwei | 22.00 Gwei | +113.6% |
 | USDC_USDT | 63.65 Gwei | 22.84 Gwei | +178.6% |
 
-![Gas Analysis](05_gas_analysis.png)
-![Price Timeseries](06_price_timeseries.png)
+![Gas Analysis](analysis/output/05_gas_analysis.png)
+![Price Timeseries](analysis/output/06_price_timeseries.png)
 
 ## 7. Methodology & Limitations
 
