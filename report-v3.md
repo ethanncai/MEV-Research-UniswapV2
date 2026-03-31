@@ -96,9 +96,13 @@ The final detected output contains:
 
 - **845** sandwich events
 - **758** displacement events
-- **3,593** arbitrage / back-running events
+- **4,796** arbitrage / back-running events
 - **18** suppression events
-- **884** victim transactions linked to detected sandwiches
+
+![Frontrun Overview](analysis/output/01_frontrun_overview.png)
+
+**Figure 1.** Detected frontrunning activities by type and trading pair.
+
 
 These outputs form the basis of the later detection analysis and gas-price discussion.
 
@@ -177,15 +181,15 @@ Pair-level sandwich counts are as follows:
 
 ![Sandwich Timeline](analysis/output/02_sandwich_timeline.png)
 
-**Figure 1.** Monthly number of detected sandwich attacks across the analyzed pairs.
+**Figure 2.** Monthly number of detected sandwich attacks across the analyzed pairs.
 
 ![Profit Distribution](analysis/output/03_profit_distribution.png)
 
-**Figure 2.** Distribution of estimated sandwich net profit, including the skewness of profitable cases.
+**Figure 3.** Distribution of estimated sandwich net profit, including the skewness of profitable cases.
 
 ![Top Attackers](analysis/output/04_top_attackers.png)
 
-**Figure 3.** Top sandwich attackers by event count and cumulative estimated net profit.
+**Figure 4.** Top sandwich attackers by event count and cumulative estimated net profit.
 
 ---
 
@@ -250,7 +254,7 @@ Top 5 Displacement Frontrunners are:
 
 ![Displacement](analysis/output/07_displacement.png)
 
-**Figure 4.** Distribution of displacement gas ratios and pair-level event counts.
+**Figure 5.** Distribution of displacement gas ratios and pair-level event counts.
 
 ---
 
@@ -319,7 +323,7 @@ Top 5 Back-runners are:
 
 ![Arbitrage](analysis/output/08_arbitrage.png)
 
-**Figure 5.** Estimated net-profit distribution and pair-level counts for detected arbitrage / back-running events.
+**Figure 6.** Estimated net-profit distribution and pair-level counts for detected arbitrage / back-running events.
 
 ---
 
@@ -381,7 +385,7 @@ Top 5 Suppressors are:
 
 ![Suppression](analysis/output/09_suppression.png)
 
-**Figure 6.** Gas-premium distribution and pair-level counts for detected suppression events.
+**Figure 7.** Gas-premium distribution and pair-level counts for detected suppression events.
 
 ---
 
@@ -405,7 +409,7 @@ The gas analysis therefore strengthens the interpretation of the detected events
 
 ![Gas Analysis](analysis/output/05_gas_analysis.png)
 
-**Figure 7.** Median gas price in sandwich-related blocks versus normal blocks across the analyzed pairs.
+**Figure 8.** Median gas price in sandwich-related blocks versus normal blocks across the analyzed pairs.
 
 ---
 
