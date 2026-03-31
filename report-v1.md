@@ -128,22 +128,22 @@ For a detected sandwich, profit is estimated from the attacker’s net gain acro
 
 The gas cost follows the fixed gas model used in the report:
 
-$$
+```math
 \text{GasCostUSD}
 =
 \frac{(\texttt{gas\_price}_{front}+\texttt{gas\_price}_{back})\times 150000}{10^{18}}
 \times P_{\mathrm{ETH}}(B)
-$$
+```
 
 The final net profit is defined as:
 
-$$
+```math
 \text{NetProfitUSD}
 =
 \text{ProfitUSD}
 -
 \text{GasCostUSD}
-$$
+```
 
 In the implementation, `ProfitUSD` is obtained from the attacker’s net token balance after the two legs are completed, while `GasCostUSD` uses the fixed estimate of 150,000 gas per swap.
 
@@ -153,13 +153,13 @@ For back-running, profit is estimated from the back-runner’s net token output 
 
 The calculation follows the same general structure:
 
-$$
+```math
 \text{NetProfitUSD}
 =
 \text{ProfitUSD}
 -
 \text{GasCostUSD}
-$$
+```
 
 Here, `ProfitUSD` denotes the USD value of the back-runner’s net token gain, and `GasCostUSD` is computed using the same fixed gas assumption and block-level ETH price. This provides a consistent valuation framework across the different detected MEV patterns.
 
@@ -168,6 +168,7 @@ Here, `ProfitUSD` denotes the USD value of the back-runner’s net token gain, a
 USD valuation depends on token type and historical price information. Stablecoins such as USDC, USDT, and DAI are treated directly in USD terms. For WETH and other non-stablecoin assets, valuation is based on reserve-derived ETH prices and the historical ETH price index constructed during preprocessing.
 
 This design allows profits from different pairs to be compared under a common unit of account. It also supports the later gas analysis and result summaries reported in the final output.
+
 
 
 
