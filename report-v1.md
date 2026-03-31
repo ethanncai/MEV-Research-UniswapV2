@@ -32,42 +32,32 @@ Suppression involves an entity "clogging" a block with high-gas transactions to 
 
 ---
 
-## 5. Profit and Impact Analysis
-The analysis phase quantifies the economic outcomes and network effects of the detected MEV activities.
+## 5. Profit Estimation
 
-## 5. Profit and Impact Analysis
+The analysis phase quantifies the economic outcomes of detected MEV activities by reconstructing token flows and subtracting transaction costs.
 
-The analysis phase quantifies the economic outcomes and network effects of the detected MEV activities by reconstructing token flows and estimating gas expenditures.
+### 5.1 Sandwich Profit
+The profit for a sandwich attack is calculated by analyzing the net balance change of the attacker's address across the front-run and back-run transaction pair within the same block.
 
-### 5.1 Profit Calculation Methodology
-The profit calculation follows a standardized pipeline to convert on-chain swaps into a comparable net USD value:
+* **Methodology**: The system identifies the initial token spend in the front-run swap and the subsequent token receipt in the back-run swap. The "Gross Profit" is the USD value of the surplus tokens held by the attacker after the sequence completes.
+* **Formula**:
+    $$Net\ Profit_{sandwich} = Gross\ Profit - Gas\ Cost$$
+    Where:
+    $$Gross\ Profit = (Token\ Out_{backrun} - Token\ In_{frontrun}) \times Price_{USD}$$
+    $$Gas\ Cost = \sum (Gas\ Used \times Gas\ Price \times ETH\ Price)$$
+* **Implementation**: As defined in `analyzers.py`, the system uses `ESTIMATED_GAS_PER_SWAP` to account for the gas consumed by both legs of the attack.
 
-* **Gross Profit Reconstruction**: For each MEV event, the system calculates the net balance change of the involved tokens. 
-    * **Sandwich**: Sum of token changes from both the front-run and back-run transactions.
-    * **Arbitrage/Back-run**: The net token gain from the single or atomic set of arbitrage swaps.
-* **USD Normalization**: Profits are converted to USD based on the spot price at the time of the transaction.
-    * Stablecoins (USDC, USDT, DAI) are treated as $1.
-    * WETH price is derived from `Sync` events or a historical index.
-    * WBTC is valued using a fixed `BTC_ETH_RATIO_APPROX`.
-* **Net Profit Formula**: As shown in the research framework, the net profit is the gross profit minus the estimated gas cost:
-    $$Net\ Profit = Gross\ Profit\ (USD) - (Gas\ Used \times Gas\ Price \times ETH\ Price)$$
-    *Note: A constant `ESTIMATED_GAS_PER_SWAP` is applied to account for the overhead of standard UniswapV2 interactions.*
+### 5.2 Back-run Profit
+Back-run (Arbitrage) profit measures the gain from a single transaction that captures price imbalances created by a preceding large-volume trade.
 
-> **[ACTION: 请在此处插入报告中展示利润计算公式和逻辑步骤的截图（对应 image_21fc41.png）。]**
+* **Methodology**: The profit is derived from the net change in the attacker's balance for a specific token pair after the execution of the back-run swap. Since back-runs often involve competing in high-gas environments, the gas cost significantly impacts the final margin.
+* **Formula**:
+    $$Net\ Profit_{backrun} = Gross\ Profit - Gas\ Cost$$
+    Where:
+    $$Gross\ Profit = Net\ Token\ Gain \times Price_{USD}$$
+    $$Gas\ Cost = Gas\ Used \times Gas\ Price \times ETH\ Price$$
+* **Valuation**: For non-stablecoin pairs, the `Price_USD` is derived using the `Sync` event reserves to calculate the spot price, or through a historical index as implemented in the `_token_to_usd` helper function.
 
-### 5.2 Results Distribution
-The financial impact is visualized through cumulative growth and individual event distributions:
-* **Cumulative Net Profit**: Tracks the aggregate earnings over the analyzed period, highlighting phases of high MEV activity.
-* **Profit Distribution**: Analyzes the frequency of profit magnitudes, revealing that while many events have small margins, the total profit is heavily driven by high-value outliers.
-
-> **[ACTION: 请在此处插入 "Cumulative Net Profit over Time" 曲线图（对应 image_1f2fa2.png）。]**
-> **[ACTION: 请在此处插入 "Arbitrage / Back-run Profit Distribution" 直方图（对应 image_1f2fd8.png）。]**
-
-### 5.3 Market Impact (Gas Analysis)
-The system evaluates how MEV competition affects the broader network:
-* **Gas Premium**: Measured as the ratio of the MEV transaction's gas price to the block's median gas price.
-* **Network Crowding**: High-frequency attacks (like Suppression) are analyzed for their role in inflating block-level gas costs, which impacts the execution environment for regular users.
-* **Market Impact**: Beyond direct profit, the system measures "Gas Premium." It compares the median gas price of "attack blocks" (blocks containing MEV) against "normal blocks" to quantify how MEV competition drives up costs for average users.
 
 ---
 
@@ -80,18 +70,34 @@ Across the analyzed dataset of over 1.3 million swaps, a total of 6,417 MEV-rela
 |-------------------|----------------|
 | Sandwich (Insertion) | 845 |
 | Displacement | 758 |
-| Arbitrage / Back-run | 3,593 |
+| Arbitrage / Back-run | 4,796 |
 | Suppression | 18 |
-| **Total** | **5,214** |
+| **Total** | **6,417** |
 
-- Sandwich net profit: **$417,952.46**
-- Arbitrage net profit: **$10,889,739.32**
+- Sandwich net profit: **$402,379.84**
+- Arbitrage net profit: **$17,024,829.75**
 - Unique sandwich attackers: **83**
 
 ### 6.2 Sandwich
-Detection identified 845 sandwich incidents. While the success rate (profitability) was approximately 24.4%, the total net profit reached $402,379.84. 
+Based on the detection rules defined in Section 4.1, a total of 845 sandwich incidents were identified. The following table summarizes the distribution across the five major trading pairs:
 
-> **[ACTION: 请在此处插入报告第5页的 "Top 10 Sandwich Attackers by Net Profit" 表格。]**
+| Pair | Sandwiches | % Blocks | % Volume |
+|------|-----------|---------|---------|
+| WETH_USDC | 201 | 0.08% | 0.19% |
+| WETH_USDT | 178 | 0.08% | 0.19% |
+| WETH_DAI | 133 | 0.05% | 0.14% |
+| WETH_WBTC | 164 | 0.09% | 0.25% |
+| USDC_USDT | 169 | 0.07% | 0.21% |
+
+**Key Financial Metrics:**
+- **Profitable Events**: 198 / 845 (23.4%)
+- **Gross Profit**: $891,887.84
+- **Total Net Profit**: $417,952.46
+- **Average / Median Net**: $494.62 / $-21.64
+
+The results indicate that while the gross profit is substantial, the low profitability rate and negative median net profit highlight the significant impact of gas costs and the competitive nature of the MEV searcher market. A negative median suggests that more than half of the detected sandwich attempts resulted in a net loss after accounting for gas fees.
+
+Furthermore, the sandwich attacker landscape shows extreme centralization, as shown in the top 10 attackers by net profit:
 
 | Attacker | Count | Net Profit (USD) |
 |----------|-------|-----------------|
@@ -105,6 +111,11 @@ Detection identified 845 sandwich incidents. While the success rate (profitabili
 | `0xd78a3280…486d44` | 5 | $7,531.42 |
 | `0x3bc1588f…514326` | 2 | $7,277.87 |
 | `0xf70a5d55…511b79` | 1 | $6,915.04 |
+
+**Observations:**
+* **Dominance**: The top two entities alone account for a massive share of the total net profit, suggesting that professional searchers with optimized infrastructure dominate the market.
+* **Outliers**: Address `0x93dabae1…955579` realized over $30,000 in profit from a single event, indicating the detection of rare, extremely high-slippage opportunities.
+* **Optimization**: Multiple top attackers use "0x0000" vanity addresses, a technical optimization used by sophisticated bots to minimize gas costs during execution.
 
 ### 6.3 Displacement
 A total of 758 displacement events were detected. The defining characteristic was the extreme gas competition, with attackers paying over 2,200 times the victim's gas price on average.
