@@ -87,7 +87,7 @@ To estimate profits in USD terms, the system builds a historical ETH price index
 Stablecoins such as `USDC`, `USDT`, and `DAI` are treated directly as USD-denominated assets. `WETH` is converted using the reconstructed ETH price series. `WBTC` is converted using an approximate fixed ratio to ETH:
 
 $$
-\texttt{BTC\_ETH\_RATIO\_APPROX} = 15.0
+\mathrm{BTCETHRatioApprox} = 15.0
 $$
 
 ### 3.7 Output Summary
@@ -133,19 +133,19 @@ For each detected sandwich, the project computes the attacker's net token gain a
 The gross profit is:
 
 $$
-\text{ProfitUSD} = \text{USD}(\text{net\_token0}) + \text{USD}(\text{net\_token1})
+\mathrm{ProfitUSD} = \mathrm{USD}(n_0) + \mathrm{USD}(n_1)
 $$
 
 Gas cost is estimated using a fixed gas model of 150,000 gas per swap:
 
 $$
-\text{GasCostUSD} = \frac{(\texttt{gas\_price}_{front} + \texttt{gas\_price}_{back}) \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
+\mathrm{GasCostUSD} = \frac{(g_{\mathrm{front}} + g_{\mathrm{back}}) \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
 $$
 
 The final estimated net profit is:
 
 $$
-\text{NetProfitUSD} = \text{ProfitUSD} - \text{GasCostUSD}
+\mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
 $$
 
 This is the most direct and complete profit model among the four detection categories.
@@ -208,7 +208,7 @@ The detector scans pairs of swaps inside the same block and flags a displacement
 5. The gas-price ratio satisfies:
 
 $$
-\frac{\texttt{gas\_price}_{f}}{\texttt{gas\_price}_{v}} \ge 1.5
+\frac{g_f}{g_v} \ge 1.5
 $$
 
 Here, the first transaction is treated as the potential frontrunner and the later transaction as the potential victim.
@@ -286,13 +286,13 @@ For each detected back-runner, the project computes the net token output of the 
 The resulting gross value is then reduced by estimated gas cost:
 
 $$
-\text{NetProfitUSD} = \text{ProfitUSD} - \text{GasCostUSD}
+\mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
 $$
 
 where:
 
 $$
-\text{GasCostUSD} = \frac{\texttt{backrunner\_gas\_price} \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
+\mathrm{GasCostUSD} = \frac{g_{\mathrm{back}} \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
 $$
 
 This gives a consistent profit proxy for comparing back-running opportunities across pairs.
@@ -344,7 +344,7 @@ The detector first computes the median gas price for each block. It then aggrega
 Formally, the gas-premium threshold is:
 
 $$
-\text{GasPremium} = \frac{\text{Entity Median Gas}}{\text{Block Median Gas}} \ge 3.0
+\mathrm{GasPremium} = \frac{\mathrm{EntityMedianGas}}{\mathrm{BlockMedianGas}} \ge 3.0
 $$
 
 This detector is intentionally heuristic. It is designed to identify unusually aggressive same-block gas bidding, not to prove direct victim loss in every case.
