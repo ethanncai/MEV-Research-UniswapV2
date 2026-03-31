@@ -66,7 +66,7 @@ The effective trading entity is defined heuristically. If the `sender` address i
 To reconstruct the execution order inside each block, swaps are sorted by `block_number`, `tx_index`, and `log_index`. Formally, the in-block order of a transaction is represented as:
 
 $$
-\operatorname{ord}(x) = (\texttt{tx\_index}_x,\ \texttt{log\_index}_x)
+\mathrm{ord}(x) = (\mathrm{txIndex}_x,\ \mathrm{logIndex}_x)
 $$
 
 This ordering is essential because all four detection methods rely on the exact relative position of swaps inside the same block.
