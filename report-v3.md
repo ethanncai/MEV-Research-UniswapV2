@@ -39,12 +39,6 @@
     - [4.4.5 Figure](#445-figure)
 - [5. Gas Price Analysis](#5-gas-price-analysis)
 - [6. Limitation](#6-limitation)
-  - [6.1 On-Chain Visibility Only](#61-on-chain-visibility-only)
-  - [6.2 Heuristic Entity Identification](#62-heuristic-entity-identification)
-  - [6.3 Simplified Gas Model](#63-simplified-gas-model)
-  - [6.4 Price Approximation](#64-price-approximation)
-  - [6.5 Threshold Sensitivity](#65-threshold-sensitivity)
-  - [6.6 Interpretation Caution](#66-interpretation-caution)
 - [7. Conclusion](#7-conclusion)
 - [8. References](#8-references)
 
