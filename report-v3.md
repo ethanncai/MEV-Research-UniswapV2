@@ -1,5 +1,53 @@
 # MEV Frontrunning Analysis Report
 
+## Table of Contents
+
+- [1. Introduction](#1-introduction)
+- [2. System Workflow](#2-system-workflow)
+- [3. Data Collection and Processing](#3-data-collection-and-processing)
+  - [3.1 Data Source](#31-data-source)
+  - [3.2 Event Types](#32-event-types)
+  - [3.3 Entity Identification](#33-entity-identification)
+  - [3.4 Transaction Ordering](#34-transaction-ordering)
+  - [3.5 Trade Direction Assignment](#35-trade-direction-assignment)
+  - [3.6 Price Reconstruction and Valuation Setup](#36-price-reconstruction-and-valuation-setup)
+  - [3.7 Output Summary](#37-output-summary)
+- [4. Detection Method](#4-detection-method)
+  - [4.1 Sandwich Attacks](#41-sandwich-attacks)
+    - [4.1.1 Intuition](#411-intuition)
+    - [4.1.2 Implementation Logic](#412-implementation-logic)
+    - [4.1.3 Profit Calculation Logic](#413-profit-calculation-logic)
+    - [4.1.4 Findings](#414-findings)
+    - [4.1.5 Figure](#415-figure)
+  - [4.2 Displacement Frontrunning](#42-displacement-frontrunning)
+    - [4.2.1 Intuition](#421-intuition)
+    - [4.2.2 Implementation Logic](#422-implementation-logic)
+    - [4.2.3 Value / Profit Interpretation](#423-value--profit-interpretation)
+    - [4.2.4 Findings](#424-findings)
+    - [4.2.5 Figure](#425-figure)
+  - [4.3 Arbitrage / Back-running](#43-arbitrage--back-running)
+    - [4.3.1 Intuition](#431-intuition)
+    - [4.3.2 Implementation Logic](#432-implementation-logic)
+    - [4.3.3 Profit Calculation Logic](#433-profit-calculation-logic)
+    - [4.3.4 Findings](#434-findings)
+    - [4.3.5 Figure](#435-figure)
+  - [4.4 Suppression](#44-suppression)
+    - [4.4.1 Intuition](#441-intuition)
+    - [4.4.2 Implementation Logic](#442-implementation-logic)
+    - [4.4.3 Value / Profit Interpretation](#443-value--profit-interpretation)
+    - [4.4.4 Findings](#444-findings)
+    - [4.4.5 Figure](#445-figure)
+- [5. Gas Price Analysis](#5-gas-price-analysis)
+- [6. Limitation](#6-limitation)
+  - [6.1 On-Chain Visibility Only](#61-on-chain-visibility-only)
+  - [6.2 Heuristic Entity Identification](#62-heuristic-entity-identification)
+  - [6.3 Simplified Gas Model](#63-simplified-gas-model)
+  - [6.4 Price Approximation](#64-price-approximation)
+  - [6.5 Threshold Sensitivity](#65-threshold-sensitivity)
+  - [6.6 Interpretation Caution](#66-interpretation-caution)
+- [7. Conclusion](#7-conclusion)
+- [8. References](#8-references)
+
 ## 1. Introduction
 
 Maximum Extractable Value (MEV) refers to the additional value that can be captured by controlling transaction ordering during block construction. On automated market maker (AMM) protocols such as Uniswap V2, swap execution depends directly on the order of transactions within a block. This creates opportunities for frontrunning, back-running, and other transaction-ordering strategies.
@@ -177,7 +225,7 @@ Pair-level sandwich counts are as follows:
 | WETH_WBTC | 164 | 0.09% | 0.25% |
 | USDC_USDT | 169 | 0.07% | 0.21% |
 
-#### 4.1.5 Figure Placement
+#### 4.1.5 Figure 
 
 ![Sandwich Timeline](analysis/output/02_sandwich_timeline.png)
 
@@ -250,7 +298,7 @@ Top 5 Displacement Frontrunners are:
 | `0x80a64c6d…cd5d9e` | 20 |
 
 
-#### 4.2.5 Figure Placement
+#### 4.2.5 Figure 
 
 ![Displacement](analysis/output/07_displacement.png)
 
@@ -319,7 +367,7 @@ Top 5 Back-runners are:
 | `0x860bd2db…d78f66` | 120 |
 
 
-#### 4.3.5 Figure Placement
+#### 4.3.5 Figure 
 
 ![Arbitrage](analysis/output/08_arbitrage.png)
 
@@ -381,7 +429,7 @@ Top 5 Suppressors are:
 
 
 
-#### 4.4.5 Figure Placement
+#### 4.4.5 Figure 
 
 ![Suppression](analysis/output/09_suppression.png)
 
@@ -405,7 +453,7 @@ From the generated gas chart, the main pattern is clear:
 
 The gas analysis therefore strengthens the interpretation of the detected events: suspicious transaction-ordering patterns are not only visible in block order, but also often accompanied by unusually strong gas-price signals.
 
-### Figure Placement
+### Figure 
 
 ![Gas Analysis](analysis/output/05_gas_analysis.png)
 
@@ -417,23 +465,23 @@ The gas analysis therefore strengthens the interpretation of the detected events
 
 This study has several important limitations.
 
-### 6.1 On-Chain Visibility Only
+- **On-Chain Visibility Only**
 
 The analysis uses on-chain event data only. Failed, dropped, or replaced mempool transactions are not observable. As a result, the study cannot directly reconstruct the full competition process that happened before final block inclusion.
 
-### 6.2 Heuristic Entity Identification
+- **Heuristic Entity Identification**
 
 Trader identity is approximated using a router-based heuristic. When a transaction is sent through a known router, the `to` address is treated as the actual entity; otherwise, the `sender` is used. This improves practical grouping, but it may still merge unrelated transactions or split activity that belongs to the same trader.
 
-### 6.3 Simplified Gas Model
+- **Simplified Gas Model**
 
 Gas cost is estimated using a fixed assumption of **150,000 gas per swap**. Actual gas usage may vary across transactions, so reported net profit values should be interpreted as estimates rather than exact realized outcomes.
 
-### 6.4 Price Approximation
+- **Price Approximation**
 
 USD valuation relies on reserve-derived ETH prices and a fixed approximate conversion rule for WBTC. Although this makes consistent comparison possible, it introduces approximation error, especially in volatile periods.
 
-### 6.5 Threshold Sensitivity
+- **Threshold Sensitivity**
 
 Several detection rules depend on heuristic thresholds, including:
 
@@ -444,7 +492,7 @@ Several detection rules depend on heuristic thresholds, including:
 
 Changing these thresholds would change the number of detected events and may affect the balance between false positives and false negatives.
 
-### 6.6 Interpretation Caution
+- **Interpretation Caution**
 
 The report identifies patterns that are strongly consistent with known MEV strategies, but it does not prove malicious intent in every case. Some flagged events may reflect ordinary reactive trading or legitimate high-priority execution rather than explicit predatory behavior.
 
@@ -462,3 +510,9 @@ The results show that different MEV patterns exhibit different economic characte
 - **Suppression** is rare but associated with extreme gas-price premiums.
 
 Overall, the analysis shows that ordered swap data and gas-price behavior together provide a useful basis for studying MEV on AMM-based decentralized exchanges. Although the approach is limited by the absence of mempool visibility and by heuristic assumptions, it remains a practical and reproducible framework for investigating transaction-ordering behavior on Uniswap V2.
+
+## 8. References
+
+[1] Frontrunner jones and the raiders of the dark forest: An empirical study of frontrunning on the ethereum blockchain. Usenix security 2021.
+
+[2] Quantifying Blockchain Extractable Value: How dark is the forest? SP 2022.
