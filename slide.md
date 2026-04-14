@@ -144,7 +144,33 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 ---
 
-## 8. Market impact
+## 8. Profit Distribution & Top Attackers
+
+- Profit is **extremely concentrated** — a power-law distribution
+- Top **10** back-run events account for **85.1%** of total arbitrage profit ($8.4M / $9.9M)
+- Top **50** events account for **94.3%** — the remaining **3,543** events share only **5.7%**
+
+![w:520](analysis/output/03_profit_distribution.png) ![w:520](analysis/output/04_top_attackers.png)
+
+---
+
+## 9. Multi-Strategy Entities & Timeline
+
+**5 entities** operate across **all 4 attack types** simultaneously — evidence of sophisticated MEV bots
+
+| Entity | Strategies |
+| --- | --- |
+| `0x00000000…120e49` | Sandwich + Displacement + Arbitrage + Suppression |
+| `0x6b75d8af…009a80` | Sandwich + Displacement + Arbitrage + Suppression |
+| `0x3328f7f4…309c49` | Sandwich + Displacement + Arbitrage + Suppression |
+
+**Sandwich timeline**: peak activity in **March 2024** (52 events/month), declining afterward as Flashbots/MEV-Boost shifted MEV extraction off-chain
+
+![w:700](analysis/output/02_sandwich_timeline.png)
+
+---
+
+## 10. Market impact
 - Sandwich-related blocks show **significantly higher** median gas prices
 - **WETH_DAI**, **WETH_WBTC**, **USDC_USDT**: large gas premiums in suspicious blocks
 - MEV activity increases gas costs for **all users** in affected blocks
@@ -154,7 +180,7 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 ---
 
-## 9. Limitations
+## 11. Limitations
 
 - **On-chain only**: no mempool visibility; dropped/replaced txs invisible
 - **Heuristic entity ID**: router-based approach may merge/split entities
@@ -165,7 +191,7 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 ---
 
-## 10. Project Summary
+## 12. Project Summary
 
 - Complete pipeline: **collection -> detection -> profit analysis -> visualization**
 - Covers all **Project 8 requirements**: Displacement, Insertion, Suppression + bonus Arbitrage
