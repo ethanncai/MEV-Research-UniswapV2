@@ -72,10 +72,9 @@ Etherscan API v2  →  Event Decoder  →  CSV Storage
 | Detect Displacement | Same-block, same-direction, gas ratio >= 1.5x |
 | Detect Insertion | Sandwich detector: front-run + victim + back-run in same block |
 | Detect Suppression | Entity >= 3 swaps with >= 3x block median gas |
-| Analyze adversary profits | USD profit model for sandwich & arbitrage, gas cost estimation |
+| Detect Arbitrage / Back-running | Opposite-direction trade after large swap (>P90), within 3 tx positions |
+| Analyze adversary profits | USD profit model for sandwich & arbitrage, gas cost estimation, dynamic BTC/ETH pricing |
 | Analyze market impact | Gas price comparison, price time-series, block/volume penetration |
-
-**Bonus**: Arbitrage / back-running detection
 
 ---
 
@@ -115,11 +114,11 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 | Type | Events | Key Metric | Proportion |
 | --- | --- | --- | --- |
-| **Sandwich** | 845 (13.2%) | Net profit: **$402,379** | 24.4% profitable |
-| **Displacement** | 758 (11.8%) | Avg gas ratio: **2,258x** | ordering advantage |
-| **Arbitrage / Back-run** | 4,796 (74.7%) | Net profit: **$17,024,829** | avg $3,549/event |
+| **Sandwich** | 845 (16.2%) | Net profit: **$194,985** | 21.2% profitable |
+| **Displacement** | 758 (14.5%) | Avg gas ratio: **2,258x** | ordering advantage |
+| **Arbitrage / Back-run** | 3,593 (68.9%) | Net profit: **$9,895,544** | avg $2,754/event |
 | **Suppression** | 18 (0.3%) | Avg gas premium: **907x** | extreme but rare |
-| **Total** | **6,417** | **$17.4M+** aggregate | |
+| **Total** | **5,214** | **$10.1M+** aggregate | |
 
 - Arbitrage / back-running dominates both in **frequency** and **total profit**
 - Sandwich profitability is **highly concentrated** — most attempts lose money on gas
@@ -129,17 +128,17 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 ## 6. Sandwich Attack Findings
 
-- **845** events, only **206** profitable (**24.4%**) — profitability highly concentrated
-- Gross profit: **$877,638**; Net profit (after gas): **$402,379**
-- Avg net: $476; Median net: **-$23** (most attackers lose money on gas)
+- **845** events, only **179** profitable (**21.2%**) — profitability highly concentrated
+- Gross profit: **$668,920**; Net profit (after gas): **$194,985**
+- Avg net: $231; Median net: **-$23** (most attackers lose money on gas)
 
 ## 7. Displacement, Arbitrage
 
 **Displacement (758 events)** — ordering advantage via gas premium
 - Avg gas ratio: **2,258x** (extreme outliers); Top frontrunner: **82** events
 
-**Arbitrage / Back-running (4,796 events)** — most frequent pattern
-- Net profit: **$17,024,829** (avg **$3,549** per event); Top back-runner: **210** events
+**Arbitrage / Back-running (3,593 events)** — most frequent pattern
+- Net profit: **$9,895,544** (avg **$2,754** per event); Top back-runner: **210** events
 
 **Suppression (18 events)** — rarest but most extreme, avg gas premium: **907x**
 
@@ -160,7 +159,7 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 - **On-chain only**: no mempool visibility; dropped/replaced txs invisible
 - **Heuristic entity ID**: router-based approach may merge/split entities
 - **Fixed gas estimate**: 150k gas per swap is an approximation
-- **Price approximation**: reserve-derived ETH prices, fixed WBTC ratio
+- **Price approximation**: reserve-derived ETH prices, dynamic BTC/ETH ratio from pool reserves
 - **Threshold sensitivity**: 1.5x, P90, 3x thresholds affect detection counts
 - **Interpretation**: patterns are *consistent with* MEV but do not prove intent
 
@@ -170,7 +169,7 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 - Complete pipeline: **collection -> detection -> profit analysis -> visualization**
 - Covers all **Project 8 requirements**: Displacement, Insertion, Suppression + bonus Arbitrage
-- **6,417 events** detected, **$17.4M+** aggregate adversary profit quantified
+- **5,214 events** detected, **$10.1M+** aggregate adversary profit quantified
 - Gas-price analysis confirms MEV raises costs for normal traders
 
 **Deliverables**

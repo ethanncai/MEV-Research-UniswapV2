@@ -3,36 +3,74 @@ Profit calculation and market-impact analysis for all frontrunning types.
 """
 import pandas as pd
 import numpy as np
-from config import PAIR_CONFIG, ESTIMATED_GAS_PER_SWAP, BTC_ETH_RATIO_APPROX
+from config import PAIR_CONFIG, ESTIMATED_GAS_PER_SWAP
 
 
 # ---------------------------------------------------------------------------
-# ETH price helpers
+# Price helpers
 # ---------------------------------------------------------------------------
 
 def _get_eth_price(block_number, eth_price_idx):
+    """Return ETH/USD price at or before *block_number* (floor / ffill)."""
     if eth_price_idx is None or eth_price_idx.empty:
         return 2000.0
-    # searchsorted returns the insertion point (first index >= block_number).
-    # We want the last known price at or before block_number (floor / ffill),
-    # so we step back by one unless we landed exactly on the block.
     idx = eth_price_idx.index.searchsorted(block_number, side='right') - 1
     if idx < 0:
         idx = 0
     return float(eth_price_idx.iloc[idx])
 
 
-def _token_to_usd(amount, token_name, block_number, eth_price_idx):
+def _get_eth_price_before(block_number, eth_price_idx):
+    """Return ETH/USD price strictly *before* block_number.
+
+    Used as a pre-impact reference price for arbitrage profit estimation:
+    the trigger trade in the current block has already moved the pool
+    reserves, so using the same-block price would be circular.
+    """
+    if eth_price_idx is None or eth_price_idx.empty:
+        return 2000.0
+    # side='left' gives the first index >= block_number; minus 1 gives
+    # the last entry strictly < block_number.
+    idx = eth_price_idx.index.searchsorted(block_number, side='left') - 1
+    if idx < 0:
+        idx = 0
+    return float(eth_price_idx.iloc[idx])
+
+
+def _get_btc_eth_ratio(block_number, btc_eth_idx):
+    """Return dynamic BTC/ETH ratio at or before *block_number*.
+
+    Falls back to 15.0 when no index is available (matches the historical
+    average over the dataset's time range).
+    """
+    if btc_eth_idx is None or btc_eth_idx.empty:
+        return 15.0
+    idx = btc_eth_idx.index.searchsorted(block_number, side='right') - 1
+    if idx < 0:
+        idx = 0
+    return float(btc_eth_idx.iloc[idx])
+
+
+def _token_to_usd(amount, token_name, block_number, eth_price_idx,
+                   btc_eth_idx=None):
+    """Convert a token amount to USD.
+
+    Stablecoins are 1:1.  WETH uses the ETH/USD price index.
+    WBTC uses a *dynamic* BTC/ETH ratio derived from the WETH_WBTC pool
+    reserves (instead of the old fixed 15× constant).
+    """
     if token_name in ('USDC', 'USDT', 'DAI'):
         return amount
     if token_name == 'WETH':
         return amount * _get_eth_price(block_number, eth_price_idx)
     if token_name == 'WBTC':
-        return amount * _get_eth_price(block_number, eth_price_idx) * BTC_ETH_RATIO_APPROX
+        eth_price = _get_eth_price(block_number, eth_price_idx)
+        btc_eth = _get_btc_eth_ratio(block_number, btc_eth_idx)
+        return amount * eth_price * btc_eth
     return amount
 
 
-def _swap_value_usd(row, prefix, pair_cfg, eth_price_idx):
+def _swap_value_usd(row, prefix, pair_cfg, eth_price_idx, btc_eth_idx=None):
     """Estimate the USD value of one side of a swap (inputs or outputs)."""
     d0, d1 = pair_cfg['token0_decimals'], pair_cfg['token1_decimals']
     t0, t1 = pair_cfg['token0_name'], pair_cfg['token1_name']
@@ -40,8 +78,8 @@ def _swap_value_usd(row, prefix, pair_cfg, eth_price_idx):
 
     a0 = row.get(f'{prefix}_amount0_in', 0) + row.get(f'{prefix}_amount0_out', 0)
     a1 = row.get(f'{prefix}_amount1_in', 0) + row.get(f'{prefix}_amount1_out', 0)
-    usd0 = _token_to_usd(a0 / (10 ** d0), t0, blk, eth_price_idx)
-    usd1 = _token_to_usd(a1 / (10 ** d1), t1, blk, eth_price_idx)
+    usd0 = _token_to_usd(a0 / (10 ** d0), t0, blk, eth_price_idx, btc_eth_idx)
+    usd1 = _token_to_usd(a1 / (10 ** d1), t1, blk, eth_price_idx, btc_eth_idx)
     return max(usd0, usd1)
 
 
@@ -49,7 +87,7 @@ def _swap_value_usd(row, prefix, pair_cfg, eth_price_idx):
 # 1. Sandwich profit
 # ---------------------------------------------------------------------------
 
-def calculate_sandwich_profits(sandwiches_df, eth_price_idx):
+def calculate_sandwich_profits(sandwiches_df, eth_price_idx, btc_eth_idx=None):
     if sandwiches_df.empty:
         return sandwiches_df
 
@@ -68,8 +106,8 @@ def calculate_sandwich_profits(sandwiches_df, eth_price_idx):
         net0 = net0_raw / (10 ** d0)
         net1 = net1_raw / (10 ** d1)
 
-        profit_usd = _token_to_usd(net0, t0, blk, eth_price_idx) \
-                   + _token_to_usd(net1, t1, blk, eth_price_idx)
+        profit_usd = _token_to_usd(net0, t0, blk, eth_price_idx, btc_eth_idx) \
+                   + _token_to_usd(net1, t1, blk, eth_price_idx, btc_eth_idx)
 
         gas_cost_eth = ((s['front_gas_price'] + s['back_gas_price'])
                         * ESTIMATED_GAS_PER_SWAP) / 1e18
@@ -90,7 +128,7 @@ def calculate_sandwich_profits(sandwiches_df, eth_price_idx):
 # 2. Displacement profit estimate
 # ---------------------------------------------------------------------------
 
-def calculate_displacement_profits(disp_df, eth_price_idx):
+def calculate_displacement_profits(disp_df, eth_price_idx, btc_eth_idx=None):
     """
     The frontrunner's 'profit' from displacement is the price advantage they
     obtained by executing first.  We estimate it as:
@@ -105,8 +143,8 @@ def calculate_displacement_profits(disp_df, eth_price_idx):
     for _, r in disp_df.iterrows():
         cfg = PAIR_CONFIG[r['pair']]
         blk = r['block_number']
-        fr_val = _swap_value_usd(r, 'frontrunner', cfg, eth_price_idx)
-        vic_val = _swap_value_usd(r, 'victim', cfg, eth_price_idx)
+        fr_val = _swap_value_usd(r, 'frontrunner', cfg, eth_price_idx, btc_eth_idx)
+        vic_val = _swap_value_usd(r, 'victim', cfg, eth_price_idx, btc_eth_idx)
         gas_eth = r['frontrunner_gas_price'] * ESTIMATED_GAS_PER_SWAP / 1e18
         gas_usd = gas_eth * _get_eth_price(blk, eth_price_idx)
         rows.append({
@@ -123,7 +161,19 @@ def calculate_displacement_profits(disp_df, eth_price_idx):
 # 3. Arbitrage / back-run profit estimate
 # ---------------------------------------------------------------------------
 
-def calculate_arbitrage_profits(arb_df, eth_price_idx):
+def calculate_arbitrage_profits(arb_df, eth_price_idx, btc_eth_idx=None):
+    """Estimate back-runner profit using a *pre-impact* reference price.
+
+    The trigger trade in the current block has already moved the pool
+    reserves, so the same-block ETH price (derived from those reserves)
+    is distorted.  We therefore use the ETH price from the *previous*
+    block as the fair-market reference when converting the back-runner's
+    net token change to USD.
+
+    The result represents the price-discrepancy profit the back-runner
+    captures by buying at the distorted in-pool price and (implicitly)
+    selling at the undistorted market price elsewhere.
+    """
     if arb_df.empty:
         return arb_df
 
@@ -136,17 +186,35 @@ def calculate_arbitrage_profits(arb_df, eth_price_idx):
 
         net0 = (r['backrunner_amount0_out'] - r['backrunner_amount0_in']) / (10 ** d0)
         net1 = (r['backrunner_amount1_out'] - r['backrunner_amount1_in']) / (10 ** d1)
-        profit_usd = _token_to_usd(net0, t0, blk, eth_price_idx) \
-                   + _token_to_usd(net1, t1, blk, eth_price_idx)
+
+        # ── Key change: use pre-impact (previous-block) ETH price ──
+        # This avoids circular pricing: the trigger trade already moved
+        # the pool reserves that feed the same-block ETH price index.
+        eth_ref = _get_eth_price_before(blk, eth_price_idx)
+
+        def _to_usd_ref(amount, token_name):
+            """Convert using the pre-impact ETH reference price."""
+            if token_name in ('USDC', 'USDT', 'DAI'):
+                return amount
+            if token_name == 'WETH':
+                return amount * eth_ref
+            if token_name == 'WBTC':
+                btc_eth = _get_btc_eth_ratio(blk, btc_eth_idx)
+                return amount * eth_ref * btc_eth
+            return amount
+
+        profit_usd = _to_usd_ref(net0, t0) + _to_usd_ref(net1, t1)
 
         gas_eth = r['backrunner_gas_price'] * ESTIMATED_GAS_PER_SWAP / 1e18
-        gas_usd = gas_eth * _get_eth_price(blk, eth_price_idx)
+        gas_usd = gas_eth * eth_ref
 
         rows.append({
             'backrun_profit_usd': profit_usd,
             'gas_cost_usd': gas_usd,
             'net_profit_usd': profit_usd - gas_usd,
-            'trigger_value_usd': _swap_value_usd(r, 'trigger', cfg, eth_price_idx),
+            'trigger_value_usd': _swap_value_usd(r, 'trigger', cfg,
+                                                  eth_price_idx, btc_eth_idx),
+            'eth_ref_price': eth_ref,
         })
 
     return pd.concat([arb_df.reset_index(drop=True),

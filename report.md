@@ -114,11 +114,7 @@ If the input side is unambiguous, the direction is inferred directly from the no
 
 To estimate profits in USD terms, the system builds a historical ETH price index from Uniswap V2 reserves. It first uses `WETH_USDC` reserve data. If this pair is unavailable, it falls back to `WETH_USDT` and then `WETH_DAI`.
 
-Stablecoins such as `USDC`, `USDT`, and `DAI` are treated directly as USD-denominated assets. `WETH` is converted using the reconstructed ETH price series. `WBTC` is converted using an approximate fixed ratio to ETH:
-
-$$
-\mathrm{BTCETHRatioApprox} = 15.0
-$$
+Stablecoins such as `USDC`, `USDT`, and `DAI` are treated directly as USD-denominated assets. `WETH` is converted using the reconstructed ETH price series. `WBTC` is converted using a dynamic BTC/ETH ratio derived from the `WETH_WBTC` pool reserves, which provides historically accurate pricing instead of a fixed approximation.
 
 ### 3.7 Output Summary
 
@@ -126,7 +122,7 @@ The final detected output contains:
 
 - **845** sandwich events
 - **758** displacement events
-- **4,796** arbitrage / back-running events
+- **3,593** arbitrage / back-running events
 - **18** suppression events
 
 ![Frontrun Overview](analysis/output/01_frontrun_overview.png)
@@ -186,14 +182,14 @@ This is the most direct and complete profit model among the four detection categ
 
 #### 4.1.4 Findings
 
-A total of **845** sandwich attacks were detected. Among them, **198** have positive estimated net profit, which means that profitable events account for about **23.4%** of all detected sandwiches.
+A total of **845** sandwich attacks were detected. Among them, **179** have positive estimated net profit, which means that profitable events account for about **21.2%** of all detected sandwiches.
 
 The aggregate sandwich profitability is:
 
-- Profitable: **206** / 845 (24.4%)
-- Gross profit: **$877,638.22**
-- Net profit: **$402,379.84**
-- Avg / Median net: $476.19 / $-23.06
+- Profitable: **179** / 845 (21.2%)
+- Gross profit: **$668,920.24**
+- Net profit: **$194,984.86**
+- Avg / Median net: $230.75 / $-23.27
 
 These results suggest that sandwich profitability is highly concentrated. Many detected cases generate low or negative net profit after gas costs, while a relatively small number of highly profitable attacks contribute a large fraction of total gains.
 
@@ -312,9 +308,9 @@ When these conditions are satisfied, the follower is recorded as an arbitrage / 
 
 #### 4.3.3 Profit Calculation Logic
 
-For each detected back-runner, the project computes the net token output of the reaction trade and converts it into USD. If the back-runner receives more of a token than it sends, the difference contributes to estimated profit.
+For each detected back-runner, the project computes the net token output of the reaction trade and converts it into USD. To avoid circular pricing, the system uses the ETH price from the **previous block** as the fair-market reference, since the trigger trade in the current block has already moved the pool reserves and distorted the same-block price.
 
-The resulting gross value is then reduced by estimated gas cost:
+If the back-runner receives more of a token than it sends, the difference contributes to estimated profit. The resulting gross value is then reduced by estimated gas cost:
 
 $$
 \mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
@@ -323,8 +319,10 @@ $$
 where:
 
 $$
-\mathrm{GasCostUSD} = \frac{g_{\mathrm{back}} \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
+\mathrm{GasCostUSD} = \frac{g_{\mathrm{back}} \times 150000}{10^{18}} \times P_{\mathrm{ETH}}^{\mathrm{pre}}(B)
 $$
+
+Here $P_{\mathrm{ETH}}^{\mathrm{pre}}(B)$ denotes the ETH price from the block immediately before block $B$, which serves as an undistorted market reference.
 
 This gives a consistent profit proxy for comparing back-running opportunities across pairs.
 
@@ -334,9 +332,9 @@ A total of **3,593** arbitrage / back-running events were detected, making this 
 
 Estimated profitability is substantial:
 
-- Total back-run events: **4,796**
-- Net profit: **$17,024,829.75**
-- Avg net profit: **$3,549.80**
+- Total back-run events: **3,593**
+- Net profit: **$9,895,543.96**
+- Avg net profit: **$2,754.12**
 
 Top 5 Back-runners are:
 
@@ -461,7 +459,7 @@ Gas cost is estimated using a fixed assumption of **150,000 gas per swap**. Actu
 
 - **Price Approximation**
 
-USD valuation relies on reserve-derived ETH prices and a fixed approximate conversion rule for WBTC. Although this makes consistent comparison possible, it introduces approximation error, especially in volatile periods.
+USD valuation relies on reserve-derived ETH prices. WBTC is converted using a dynamic BTC/ETH ratio reconstructed from the `WETH_WBTC` pool reserves, which provides historically accurate pricing. For arbitrage profit estimation, the system uses the previous block's ETH price as a pre-impact reference to avoid circular pricing. Despite these refinements, approximation error may still arise in highly volatile periods.
 
 - **Threshold Sensitivity**
 
