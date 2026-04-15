@@ -168,14 +168,18 @@ Dataset Crawler  →   4 MEV Detectors  →  Profit Analyzer  →  Charts + Exce
 
 | Type | Logic | Key Threshold |
 | --- | --- | --- |
-| **Sandwich (Insertion)** | Same entity, same block, opposite-direction pair with victim swap between them | victim same direction as front-run |
-| **Displacement** | Same block, same direction, different entities, frontrunner executes first | gas ratio >= **1.5x** |
-| **Arbitrage / Back-run** | Opposite-direction trade immediately after a large swap (>P90) | within **3 tx** positions |
-| **Suppression** | Single entity >= 3 swaps in block with extreme gas | gas premium >= **3x** block median |
+| **Sandwich (Insertion)** | Buy before victim, sell after — profit from victim's price impact | victim same direction as front-run |
+| **Displacement** | Pay higher gas to execute the same trade before victim | gas ratio >= **1.5x** |
+| **Arbitrage / Back-run** | Trade opposite direction right after a large swap to capture price gap | trade size > **P90**, within **3 tx** |
+| **Suppression** | Flood block with many high-gas txs to crowd out other users | >= **3** swaps, gas >= **3x** median |
 
-**Profit model (sandwich)**:
+**Profit models** ($G = \text{gasPrice} \times 150000 / 10^{18} \times P_{ETH}$):
 
-$$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 150000}{10^{18}} \times P_{ETH}$$
+**Sandwich**: $\quad n_i = \sum \text{out}_i - \sum \text{in}_i$, $\quad \text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - G_f - G_b$
+
+**Displacement**: $\quad \text{Loss} = \text{AMM}(\text{in}_v,\, R_{\text{before}}) - \text{out}_v$, $\quad \text{Net} = \text{USD}(\text{Loss}) - G_f$ $\quad$ (AMM = Uniswap V2 $xy=k$ with 0.3% fee)
+
+**Arbitrage**: $\quad \text{Net} = \text{USD}_{\text{pre}}(\text{out} - \text{in}) - G_b$ $\quad$ (use previous block price as fair reference)
 
 ---
 
