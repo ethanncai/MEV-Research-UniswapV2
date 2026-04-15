@@ -32,6 +32,31 @@ style: |
     font-size: 19px;
   }
 
+  /* Two tables + density figure in three columns, grouped to the left */
+  .side-by-side-tables {
+    display: grid;
+    grid-template-columns: auto auto auto;
+    gap: 20px;
+    align-items: start;
+    justify-content: start;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 0.4em;
+  }
+
+  .side-by-side-tables table {
+    width: auto;
+    font-size: 15px;
+  }
+
+  .side-by-side-tables .density-chart img {
+    display: block;
+    max-height: 340px;
+    max-width: 340px;
+    width: auto;
+    height: auto;
+  }
+
   code {
     font-size: 0.9em;
   }
@@ -48,50 +73,94 @@ style: |
 
 **Goal**: Collect historical Ethereum DEX transactions, detect frontrunning patterns, quantify adversary profits, and measure market impact on Uniswap V2.
 
-**Project 8 — Main steps**
+**Steps**
 
-1. Collect historical Ethereum transactions
-2. Detect Frontrunning activities (Displacement, Insertion, Suppression)
+1. Collect historical UniswapV2 logs
+2. Detect Frontrunning activities (Displacement, Insertion, Suppression Aribitrage)
 3. Analyze the profits of adversaries
-4. Analyze the impact on Ethereum marketplace (e.g., token price)
 
-**Our pipeline**
+**Pipeline**
 
 ```
-Etherscan API v2  →  Event Decoder  →  CSV Storage
-    →  4 MEV Detectors  →  Profit Analyzer  →  Charts + Excel
+Dataset Crawler  →   4 MEV Detectors  →  Profit Analyzer  →  Charts + Excel
 ```
 
 ---
 
-## 2. Requirement Coverage
+## 2. The Data
 
-| Lecture Requirement | Our Implementation |
-| --- | --- |
-| Collect historical transactions | Etherscan API v2, 5 Uniswap V2 pairs, adaptive block chunking, checkpoint resume |
-| Detect Displacement | Same-block, same-direction, gas ratio >= 1.5x |
-| Detect Insertion | Sandwich detector: front-run + victim + back-run in same block |
-| Detect Suppression | Entity >= 3 swaps with >= 3x block median gas |
-| Detect Arbitrage / Back-running | Opposite-direction trade after large swap (>P90), within 3 tx positions |
-| Analyze adversary profits | USD profit model for sandwich & arbitrage, gas cost estimation, dynamic BTC/ETH pricing |
-| Analyze market impact | Gas price comparison, price time-series, block/volume penetration |
+### 2.1 How we do this
+
+* Dune is paid, and we're not rich.
+* Etherscan API is suitable.
+  - Free quota
+  - Filter `Txs` `logs` based on contract address
+  - Has rate limit by we can use multiply accounts for load balance. 
+
+### 2.2 What we have done
+
+* We fetch five popular pairs: 
+  * `USDT-USDC` `WETH-DAI` `WETH-USDC` `WETH-USDT` `WETH-WETC`
+* Every single   from Uniswap's begining till March, 2026 was downloaded
+  - accross **14,639,489** blocks
+  - retrieve **2,690,493** logs
+  - Use **~8 hours** for smooth collect
+  - Uploaded to https://www.kaggle.com/datasets/chickenbilibili/uniswapv2-exchange-history
+
 
 ---
 
-## 3. Data Collection & Preprocessing
+## 3. The Detail of collected Data
 
-**5 Uniswap V2 pairs**: WETH/USDC, WETH/USDT, WETH/DAI, WETH/WBTC, USDC/USDT
-**Events**: `Swap`, `Sync`, `Mint`, `Burn` from block `10000835` to chain tip
 
-**Key engineering**
-- Adaptive block windows (25k default, auto shrink/grow)
-- Multi-key rate limiter with daily quota tracking
-- Checkpoint resume + parallel fetching
+- **Who are the real dealer?:** if sender is UniswapV2 router, use `to` address instead
+- **Key records:** `block_number` + `timestamp` + `tx_index` + `log_index` + `...`
+- **Event** We examined `UniswapV2Pair.sol` and collect four event: `Swap / Sync / Mint / Burn`
 
-**Preprocessing**
-- **Entity ID**: if sender is UniswapV2 router, use `to` address instead
-- **Ordering**: sort by `(block_number, tx_index, log_index)`
-- **ETH price index**: built from WETH/USDC reserves (fallback USDT, DAI)
+<div class="side-by-side-tables">
+
+<div>
+
+<p><strong>By event type</strong></p>
+<table>
+<thead><tr><th>Logs</th><th>records</th></tr></thead>
+<tbody>
+<tr><td><strong>Sync</strong></td><td>1,349,490</td></tr>
+<tr><td><strong>Swap</strong></td><td>1,315,097</td></tr>
+<tr><td><strong>Mint</strong></td><td>13,381</td></tr>
+<tr><td><strong>Burn</strong></td><td>12,505</td></tr>
+<tr><td><strong>Summary</strong></td><td><strong>2,690,473</strong></td></tr>
+</tbody>
+</table>
+
+</div>
+
+<div>
+
+<p><strong>By pair</strong></p>
+<table>
+<thead><tr><th>pair</th><th>records</th></tr></thead>
+<tbody>
+<tr><td><strong>WETH_USDC</strong></td><td>635,388</td></tr>
+<tr><td><strong>WETH_DAI</strong></td><td>569,821</td></tr>
+<tr><td><strong>WETH_USDT</strong></td><td>566,975</td></tr>
+<tr><td><strong>USDC_USDT</strong></td><td>493,501</td></tr>
+<tr><td><strong>WETH_WBTC</strong></td><td>424,788</td></tr>
+<tr><td><strong>Summary</strong></td><td><strong>2,690,473</strong></td></tr>
+</tbody>
+</table>
+
+</div>
+
+<div class="density-chart">
+
+<p><strong>Daily log density (WETH–WBTC)</strong></p>
+<img src="analysis/output/event_density_WETH_WBTC.png" alt="WETH-WBTC event density over time" />
+
+</div>
+
+</div>
+
 
 ---
 
