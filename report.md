@@ -35,34 +35,24 @@ This workflow allows the entire analysis to be reproduced from structured histor
 
 ## 3. Data Collection and Processing
 
-### 3.1 Ingestion stack (Etherscan API + Uniswap V2 `Pair`)
+### 3.1 Crawler Outcome (Etherscan API + Uniswap V2 `Pair`)
 
-We do **not** scrape block-explorer HTML. Ingestion is implemented in Python (`uniswap_fetcher/`) and uses the **Etherscan HTTP API v2** only.
+The crawler is implemented in Python (`uniswap_fetcher/`) and uses the Etherscan `getLogs` API
+to pull Uniswap V2 pair events directly from Ethereum mainnet. Instead of emphasizing API internals,
+we report measurable outcomes:
 
-**API endpoint and query shape.** Calls use `GET https://api.etherscan.io/v2/api` with `module=logs`, `action=getLogs`, and `chainid=1` (Ethereum mainnet). The JSON payload is the same **event-log shape** you would expect from JSON-RPC `eth_getLogs`, but obtained through Etherscan’s gateway instead of a self-hosted node.
+- **Coverage**: from early Uniswap V2 history to March 2026, spanning **14,639,489 blocks**.
+- **Scale**: **2,690,493** raw logs fetched; **2,690,473** usable decoded records after
+  filtering and normalization.
+- **Pairs**: `WETH_USDC`, `WETH_USDT`, `WETH_DAI`, `WETH_WBTC`, `USDC_USDT`.
+- **Collection efficiency**: full run completed in about **8 hours** under key rotation, rate
+  limiting, and retry control.
+- **Reproducibility**: fetched data are published on Kaggle for independent verification:  
+  **https://www.kaggle.com/datasets/chickenbilibili/uniswapv2-exchange-history**
 
-**Per-request filters.** Each call is constrained to:
-
-- one **Uniswap V2 `Pair` contract** (the pool whose events we ingest), and  
-- a **closed block interval** `[fromBlock, toBlock]` (inclusive endpoints).
-
-**Pagination and adaptive block windows.** Etherscan returns at most **1000** logs per response (`offset=1000`). The fetcher therefore walks history in **block chunks**, not a single range. Chunk size is adaptive:
-
-- Default step is on the order of **25k** blocks, clamped between **500** and **80k**.  
-- If a chunk returns **1000** logs, the window is treated as **saturated**; the step **shrinks** and the overlapping range is refined until responses are not truncated.  
-- If a chunk is **sparse**, the step **increases** to cut down the number of HTTP calls.
-
-**API keys, rate limits, and retries.** Keys are listed in `api_keys.txt` (one per line) and **rotated** so each request is attributed to a single key. A **token-bucket limiter** enforces **calls per second** and tracks **daily** usage per key. On rate limits or transient failures (timeouts, “server busy”), the client retries with **exponential backoff** (up to **eight** attempts) over a persistent **`requests.Session`**.
-
-**Checkpointing and optional parallelism.** For each pair, `data/checkpoint.json` stores the last completed block and cumulative per-event counts so a run can **resume** after quota exhaustion or `Ctrl+C`. Several pairs may be processed concurrently via a **thread pool**; workers share the same limiter so concurrency does not violate per-key caps.
-
-**Decoding and on-disk layout.** Raw logs are decoded offline with **`eth_abi`** into `Swap`, `Sync`, `Mint`, and `Burn` records (selected by **`topic0`** = keccak event signature). Outputs are append-friendly CSVs under `data/<PAIR_NAME>/`: `swaps.csv`, `syncs.csv`, `mints.csv`, `burns.csv`.
-
-**Public repository.** The collected datasets, the fetcher, and the analysis code are hosted on GitHub so reviewers can **clone a frozen snapshot** without re-querying Etherscan:
-
-**https://github.com/ethanncai/MEV-Analyzer**
-
-That repository is intended to match the on-disk tree used here (`data/<PAIR_NAME>/`, checkpoints, configuration files, and processing scripts).
+Implementation details that guarantee stable collection include adaptive block-window pagination,
+checkpoint resume, and per-key throttling. Logs are decoded into `Swap`, `Sync`, `Mint`, and `Burn`
+CSV files under `data/<PAIR_NAME>/`.
 
 **Pair contracts configured for this project** (each row is one `UniswapV2Pair` deployed address):
 
@@ -118,7 +108,15 @@ Stablecoins such as `USDC`, `USDT`, and `DAI` are treated directly as USD-denomi
 
 ### 3.7 Output Summary
 
-The final detected output contains:
+The crawler outputs event-level records before detector execution:
+
+- **Sync**: 1,349,490
+- **Swap**: 1,315,097
+- **Mint**: 13,381
+- **Burn**: 12,505
+- **Total**: **2,690,473**
+
+The subsequent detector output contains:
 
 - **845** sandwich events
 - **758** displacement events
