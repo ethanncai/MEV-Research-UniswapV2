@@ -76,7 +76,7 @@ style: |
 **Steps**
 
 1. Collect historical UniswapV2 logs
-2. Detect Frontrunning activities (Displacement, Insertion, Suppression Aribitrage)
+2. Detect Frontrunning activities (Displacement, Insertion, Suppression and Aribitrage)
 3. Analyze the profits of adversaries
 
 **Pipeline**
@@ -184,14 +184,14 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 | Type | Events | Key Metric | Proportion |
 | --- | --- | --- | --- |
 | **Sandwich** | 845 (16.2%) | Net profit: **$194,985** | 21.2% profitable |
-| **Displacement** | 758 (14.5%) | Avg gas ratio: **2,258x** | ordering advantage |
+| **Displacement** | 758 (14.5%) | Est. profit: **$575,132** | 15.3% profitable |
 | **Arbitrage / Back-run** | 3,593 (68.9%) | Net profit: **$9,895,544** | avg $2,754/event |
-| **Suppression** | 18 (0.3%) | Avg gas premium: **907x** | extreme but rare |
-| **Total** | **5,214** | **$10.1M+** aggregate | |
+| **Suppression** | 18 (0.3%) | Median gas premium: **20.5x** | extreme but rare |
+| **Total** | **5,214** | **$10.7M+** aggregate | |
 
 - Arbitrage / back-running dominates both in **frequency** and **total profit**
 - Sandwich profitability is **highly concentrated** — most attempts lose money on gas
-- Suppression is the rarest but shows **extreme** gas competition (907x block median)
+- Suppression is the rarest but shows **extreme** gas competition (median 20.5x)
 
 ---
 
@@ -201,15 +201,15 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 - Gross profit: **$668,920**; Net profit (after gas): **$194,985**
 - Avg net: $231; Median net: **-$23** (most attackers lose money on gas)
 
-## 7. Displacement, Arbitrage
+## 7. Displacement, Arbitrage and Suppression
 
 **Displacement (758 events)** — ordering advantage via gas premium
-- Avg gas ratio: **2,258x** (extreme outliers); Top frontrunner: **82** events
+- Median gas ratio: **3.2x** (P95: 125x); Top frontrunner: **82** events
 
 **Arbitrage / Back-running (3,593 events)** — most frequent pattern
 - Net profit: **$9,895,544** (avg **$2,754** per event); Top back-runner: **210** events
 
-**Suppression (18 events)** — rarest but most extreme, avg gas premium: **907x**
+**Suppression (18 events)** — rarest but most extreme, median gas premium: **20.5x**
 
 ---
 
@@ -249,22 +249,11 @@ $$\text{Net} = \text{USD}(n_0) + \text{USD}(n_1) - \frac{(g_f + g_b) \times 1500
 
 ---
 
-## 11. Limitations
-
-- **On-chain only**: no mempool visibility; dropped/replaced txs invisible
-- **Heuristic entity ID**: router-based approach may merge/split entities
-- **Fixed gas estimate**: 150k gas per swap is an approximation
-- **Price approximation**: reserve-derived ETH prices, dynamic BTC/ETH ratio from pool reserves
-- **Threshold sensitivity**: 1.5x, P90, 3x thresholds affect detection counts
-- **Interpretation**: patterns are *consistent with* MEV but do not prove intent
-
----
-
-## 12. Project Summary
+## 11. Project Summary
 
 - Complete pipeline: **collection -> detection -> profit analysis -> visualization**
 - Covers all **Project 8 requirements**: Displacement, Insertion, Suppression + bonus Arbitrage
-- **5,214 events** detected, **$10.1M+** aggregate adversary profit quantified
+- **5,214 events** detected, **$10.7M+** aggregate adversary profit quantified
 - Gas-price analysis confirms MEV raises costs for normal traders
 
 **Deliverables**

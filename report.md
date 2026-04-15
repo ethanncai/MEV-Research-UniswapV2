@@ -260,7 +260,7 @@ A total of **758** displacement events were detected.
 The gas-ratio statistics show strong skewness:
 
 - Total displacement events: **758**
-- Avg gas ratio (frontrunner / victim): **2258.79×**
+- Median gas ratio (frontrunner / victim): **3.2×**
 - Pairs: WETH_USDC, WETH_USDT, WETH_DAI, WETH_WBTC, USDC_USDT
 
 The very large mean indicates the presence of extreme outliers, while the median gives a more stable picture of typical same-block priority bidding.
@@ -393,9 +393,9 @@ Only **18** suppression events were detected, making suppression the rarest patt
 However, the gas-premium signal is extremely strong:
 
 - Total suppression events: **18**
-- Avg gas premium: **907.1×**
+- Median gas premium: **20.5×**
 
-The large gap between mean and median again indicates heavy-tailed outliers.
+The distribution is heavily right-skewed, with a few extreme outliers pulling the mean far above the median.
 
 Top 5 Suppressors are:
 

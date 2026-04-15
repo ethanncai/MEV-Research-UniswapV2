@@ -125,32 +125,114 @@ def calculate_sandwich_profits(sandwiches_df, eth_price_idx, btc_eth_idx=None):
 
 
 # ---------------------------------------------------------------------------
-# 2. Displacement profit estimate
+# Uniswap V2 AMM formula
 # ---------------------------------------------------------------------------
 
-def calculate_displacement_profits(disp_df, eth_price_idx, btc_eth_idx=None):
+def _uniswap_v2_get_amount_out(amount_in, reserve_in, reserve_out):
+    """Uniswap V2 getAmountOut — exact on-chain formula with 0.3% fee.
+
+    Solidity original:
+        amountInWithFee = amountIn * 997
+        numerator       = amountInWithFee * reserveOut
+        denominator     = reserveIn * 1000 + amountInWithFee
+        amountOut       = numerator / denominator
     """
-    The frontrunner's 'profit' from displacement is the price advantage they
-    obtained by executing first.  We estimate it as:
-      frontrunner_output_value − victim_output_value  (normalised by input size)
-    Because exact counterfactual reserves are unavailable, we report the raw
-    trade values for transparency and a rough estimated_advantage_usd.
+    if reserve_in <= 0 or reserve_out <= 0 or amount_in <= 0:
+        return 0.0
+    amount_in_with_fee = amount_in * 997
+    numerator = amount_in_with_fee * reserve_out
+    denominator = reserve_in * 1000 + amount_in_with_fee
+    return numerator / denominator
+
+
+# ---------------------------------------------------------------------------
+# 2. Displacement profit — counterfactual analysis
+# ---------------------------------------------------------------------------
+
+def calculate_displacement_profits(disp_df, eth_price_idx, btc_eth_idx=None,
+                                   pair_data=None):
+    """Calculate displacement profit via counterfactual reserve simulation.
+
+    For each displacement event we:
+      1. Find pool reserves just BEFORE the frontrunner's tx (from Sync data)
+      2. Simulate the victim's swap at those "clean" reserves using x*y=k
+      3. Compare counterfactual output vs actual output
+      4. victim_loss = counterfactual_output − actual_output
+      5. estimated_profit ≈ victim_loss − gas_cost
+
+    This gives the price advantage the frontrunner captured by executing first.
     """
     if disp_df.empty:
         return disp_df
 
+    # ── Pre-build per-pair Sync lookup (binary search on composite key) ──
+    sync_lookup = {}
+    if pair_data:
+        for pair_name, data in pair_data.items():
+            syncs = data['syncs'].copy()
+            syncs = syncs.sort_values(['block_number', 'tx_index', 'log_index'])
+            # Composite key: block * 1M + tx_index  (supports up to 1M txs/block)
+            sync_keys = (syncs['block_number'].values.astype(np.int64) * 1_000_000
+                         + syncs['tx_index'].values.astype(np.int64))
+            sync_lookup[pair_name] = {
+                'keys': sync_keys,
+                'reserve0': syncs['reserve0'].values.astype(float),
+                'reserve1': syncs['reserve1'].values.astype(float),
+            }
+
     rows = []
     for _, r in disp_df.iterrows():
         cfg = PAIR_CONFIG[r['pair']]
+        d0, d1 = cfg['token0_decimals'], cfg['token1_decimals']
+        t0, t1 = cfg['token0_name'], cfg['token1_name']
         blk = r['block_number']
+        direction = int(r['direction'])
+
         fr_val = _swap_value_usd(r, 'frontrunner', cfg, eth_price_idx, btc_eth_idx)
         vic_val = _swap_value_usd(r, 'victim', cfg, eth_price_idx, btc_eth_idx)
         gas_eth = r['frontrunner_gas_price'] * ESTIMATED_GAS_PER_SWAP / 1e18
         gas_usd = gas_eth * _get_eth_price(blk, eth_price_idx)
+
+        # ── Counterfactual analysis ──
+        victim_loss_usd = 0.0
+
+        if r['pair'] in sync_lookup:
+            lookup = sync_lookup[r['pair']]
+            # Find the last Sync strictly before the frontrunner's tx
+            target_key = int(blk) * 1_000_000 + int(r['frontrunner_tx_index'])
+            idx = int(np.searchsorted(lookup['keys'], target_key, side='left')) - 1
+
+            if idx >= 0:
+                r0_before = lookup['reserve0'][idx]
+                r1_before = lookup['reserve1'][idx]
+
+                if direction == 0:
+                    # Victim sends token0 → receives token1
+                    victim_in = float(r['victim_amount0_in'])
+                    victim_actual_out = float(r['victim_amount1_out'])
+                    counterfactual_out = _uniswap_v2_get_amount_out(
+                        victim_in, r0_before, r1_before)
+                    loss_raw = counterfactual_out - victim_actual_out
+                    victim_loss_usd = _token_to_usd(
+                        loss_raw / (10 ** d1), t1, blk,
+                        eth_price_idx, btc_eth_idx)
+                else:
+                    # Victim sends token1 → receives token0
+                    victim_in = float(r['victim_amount1_in'])
+                    victim_actual_out = float(r['victim_amount0_out'])
+                    counterfactual_out = _uniswap_v2_get_amount_out(
+                        victim_in, r1_before, r0_before)
+                    loss_raw = counterfactual_out - victim_actual_out
+                    victim_loss_usd = _token_to_usd(
+                        loss_raw / (10 ** d0), t0, blk,
+                        eth_price_idx, btc_eth_idx)
+
         rows.append({
             'frontrunner_value_usd': fr_val,
             'victim_value_usd': vic_val,
             'gas_cost_usd': gas_usd,
+            'victim_loss_usd': round(victim_loss_usd, 2),
+            'estimated_profit_usd': round(victim_loss_usd - gas_usd, 2),
         })
 
     return pd.concat([disp_df.reset_index(drop=True),
