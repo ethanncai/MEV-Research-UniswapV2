@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-Maximum Extractable Value (MEV) describes the extra value that can be captured by influencing transaction ordering during block construction. On automated market maker (AMM) protocols such as Uniswap V2, the outcome of a swap depends not only on pool reserves and trade size, but also on where the transaction appears within the block. This makes transaction ordering economically meaningful and creates room for strategies such as frontrunning, back-running, and sandwiching.
+Maximum Extractable Value (MEV) refers to the additional value that can be captured by influencing transaction ordering during block construction. On automated market maker (AMM) protocols such as Uniswap V2, the outcome of a swap depends not only on pool reserves and trade size, but also on where the transaction appears within the block. Transaction ordering is therefore economically meaningful and creates room for strategies such as frontrunning, back-running, and sandwiching.
 
 This project examines MEV-related behavior on Uniswap V2 using historical Ethereum mainnet event logs. The analysis focuses on five major trading pairs: `WETH_USDC`, `WETH_USDT`, `WETH_DAI`, `WETH_WBTC`, and `USDC_USDT`. Based on structured swap records reconstructed from on-chain event data, the study identifies four suspicious patterns:
 
@@ -11,7 +11,7 @@ This project examines MEV-related behavior on Uniswap V2 using historical Ethere
 - Arbitrage / back-running
 - Suppression
 
-The aim of the project is not to claim intent from isolated transactions, but to build a reproducible workflow for studying ordering-sensitive behavior on AMM markets. By combining swap ordering, gas-price signals, and profit-related estimates, the report evaluates how far these observed patterns align with known MEV strategies.
+The goal is not to infer intent from isolated transactions. Instead, the report develops a reproducible workflow for studying ordering-sensitive behavior on AMM markets. By combining swap ordering, gas-price signals, and profit-related estimates, the analysis evaluates how closely the observed patterns align with known MEV strategies.
 
 ---
 
@@ -28,7 +28,7 @@ The analysis is organized as a three-stage pipeline: data loading and preprocess
 3. **Post-analysis and visualization**  
    After detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files.
 
-Taken together, this workflow makes it possible to analyze MEV-related behavior directly from structured historical logs, even without mempool data. That limitation matters, but the pipeline still provides a practical basis for comparing suspicious transaction-ordering patterns across different Uniswap V2 pairs.
+Even without mempool data, this workflow provides a practical basis for comparing suspicious transaction-ordering patterns across major Uniswap V2 pairs. That limitation still matters, but ordered on-chain logs are sufficient to support a meaningful comparative analysis.
 
 ---
 
@@ -36,7 +36,7 @@ Taken together, this workflow makes it possible to analyze MEV-related behavior 
 
 ### 3.1 Crawler Outcome (Etherscan API + Uniswap V2 `Pair`)
 
-The crawler is implemented in Python (`uniswap_fetcher/`) and uses the Etherscan `getLogs` API to collect Uniswap V2 pair events from Ethereum mainnet. Rather than focusing on API details, this section summarizes the resulting dataset.
+The crawler is implemented in Python (`uniswap_fetcher/`) and uses the Etherscan `getLogs` API to collect Uniswap V2 pair events from Ethereum mainnet. Rather than emphasizing API mechanics, this section summarizes the resulting dataset.
 
 The crawler covers the period from early Uniswap V2 history to March 2026, spanning **14,639,489 blocks**. In total, **2,690,493** raw logs were fetched, and **2,690,473** decoded records remained after filtering and normalization. The five trading pairs included in the analysis are `WETH_USDC`, `WETH_USDT`, `WETH_DAI`, `WETH_WBTC`, and `USDC_USDT`.
 
@@ -66,7 +66,7 @@ The project uses four Uniswap V2 event types:
 - **Mint**: records liquidity additions.
 - **Burn**: records liquidity removals.
 
-Among these, `Swap` and `Sync` provide the core information needed for the final analysis.
+Among these, `Swap` and `Sync` provide the core information used in the final analysis.
 
 ### 3.3 Entity Identification
 
@@ -118,7 +118,7 @@ The subsequent detector output contains:
 
 **Figure 1.** Detected frontrunning activities by type and trading pair.
 
-These results provide the empirical basis for the later discussion of detection outcomes, profitability, and gas-price behavior.
+These detection results form the empirical basis for the later discussion of profitability, gas-price behavior, and cross-pair differences.
 
 ---
 
@@ -128,7 +128,7 @@ These results provide the empirical basis for the later discussion of detection 
 
 #### 4.1.1 Intuition
 
-A sandwich attack occurs when one entity trades before a victim transaction and then trades again after it in the same block. The first trade opens a position, the victim transaction moves the AMM price, and the second trade closes the position after that price movement. In this sense, the attacker attempts to benefit from the price impact created by the victim.
+A sandwich attack occurs when one entity trades before a victim transaction and then trades again after it in the same block. The first trade opens a position, the victim transaction moves the AMM price, and the second trade closes the position after that price movement. The attacker is therefore attempting to profit from the price impact created by the victim.
 
 #### 4.1.2 Implementation Logic
 
@@ -142,7 +142,7 @@ A sandwich candidate is recorded when all of the following conditions are satisf
 4. At least one swap from a different entity lies strictly between them in execution order.
 5. The intermediate swap has the same direction as the attacker's first trade.
 
-These conditions are intended to recover the usual front-run → victim → back-run structure directly from ordered swap data.
+These conditions are designed to recover the standard front-run → victim → back-run structure directly from ordered swap data.
 
 #### 4.1.3 Profit Calculation Logic
 
@@ -166,11 +166,11 @@ $$
 \mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
 $$
 
-Among the four detection categories, this is the most direct profit model because it evaluates the round-trip position created by the attacker inside the same block.
+Among the four detection categories, this is the most direct profit model because it evaluates the same-block round-trip position created by the attacker.
 
 #### 4.1.4 Findings
 
-A total of **845** sandwich attacks were detected. Among them, **179** have positive estimated net profit, which means that profitable cases account for about **21.2%** of all detected sandwiches.
+A total of **845** sandwich attacks were detected. Among them, **179** have positive estimated net profit, so profitable cases account for about **21.2%** of all detected sandwiches.
 
 The aggregate sandwich profitability is:
 
@@ -179,7 +179,7 @@ The aggregate sandwich profitability is:
 - Net profit: **$194,984.86**
 - Avg / Median net: $230.75 / $-23.27
 
-These results suggest that sandwich profitability is uneven rather than broadly distributed. Many detected cases become small or negative after gas cost is taken into account, while a smaller group of profitable events contributes a large share of total gains.
+Sandwich profits are clearly uneven rather than broadly distributed. Many detected cases become small or negative once gas cost is included, while a smaller set of profitable events contributes a large share of the total gains.
 
 Pair-level sandwich counts are as follows:
 
@@ -229,7 +229,7 @@ $$
 
 Here, the first transaction is treated as the potential frontrunner and the later transaction as the potential victim.
 
-This remains a same-block heuristic rather than direct proof of frontrunning. Because mempool data are unavailable, the method cannot show whether the later trader originally expected to be executed first. What it can show is a repeated pattern of close-proximity, same-direction trading accompanied by a meaningful gas-price advantage.
+This is still a same-block heuristic rather than direct proof of frontrunning. Because mempool data are unavailable, the method cannot show whether the later trader originally expected to execute first. What it can show is a repeated pattern of close-proximity, same-direction trading accompanied by a meaningful gas-price advantage.
 
 #### 4.2.3 Value / Profit Interpretation
 
@@ -243,7 +243,7 @@ However, the code does estimate the economic effect of this ordering advantage. 
 - the victim's estimated loss under the counterfactual benchmark, and
 - an estimated profit signal derived from that loss.
 
-The interpretation is therefore more cautious: displacement is best read as an ordering-advantage pattern with an estimated economic effect, rather than a clean realized arbitrage payoff.
+The interpretation should therefore remain cautious: displacement is best treated as an ordering-advantage pattern with an estimated economic effect, not as a clean realized arbitrage payoff.
 
 #### 4.2.4 Findings
 
@@ -255,7 +255,7 @@ The gas-ratio statistics show strong skewness:
 - Median gas ratio (frontrunner / victim): **3.2×**
 - Pairs: WETH_USDC, WETH_USDT, WETH_DAI, WETH_WBTC, USDC_USDT
 
-The gap between typical and extreme cases appears to be substantial. A few very large gas ratios pull the mean upward, while the median gives a more stable view of ordinary same-block priority bidding.
+The gap between ordinary and extreme cases appears substantial. A few very large gas ratios pull the mean upward, while the median gives a more stable picture of typical same-block priority bidding.
 
 Top 5 Displacement Frontrunners are:
 
@@ -297,7 +297,7 @@ For each trigger trade, the detector searches for a later swap in the same block
 
 When these conditions are satisfied, the follower is recorded as an arbitrage / back-running event.
 
-This rule is designed to capture immediate reaction trades rather than broader multi-step arbitrage paths. In practice, it highlights traders who appear to respond quickly to a large price-moving transaction inside the same block.
+This rule is meant to capture immediate reaction trades rather than broader multi-step arbitrage paths. In practice, it highlights traders who appear to respond quickly to a large price-moving transaction inside the same block.
 
 #### 4.3.3 Profit Calculation Logic
 
@@ -317,7 +317,7 @@ $$
 
 Here $P_{\mathrm{ETH}}^{\mathrm{pre}}(B)$ denotes the ETH price from the block immediately before block $B$, which serves as an undistorted market reference.
 
-This gives a practical profit proxy for comparing back-running opportunities across the analyzed pairs.
+This provides a workable profit proxy for comparing back-running opportunities across the analyzed pairs.
 
 #### 4.3.4 Findings
 
@@ -339,7 +339,7 @@ Top 5 Back-runners are:
 | `0x51c72848…502a7f` | 141 |
 | `0x860bd2db…d78f66` | 120 |
 
-The fact that back-running is both frequent and highly profitable is consistent with the structure of AMM markets. Large swaps create short-lived local imbalances, and those imbalances can often be exploited quickly by traders able to react within the same block.
+Back-running dominates the dataset both in frequency and in aggregate estimated profitability. That pattern is consistent with AMM market structure: large swaps create short-lived local imbalances, and traders able to react within the same block can often exploit them quickly.
 
 #### 4.3.5 Figure
 
@@ -374,7 +374,7 @@ This detector is intentionally heuristic. It is designed to identify unusually a
 
 Suppression does not have a directly recoverable realized-profit formula from swap logs alone. Its economic role is therefore more indirect than sandwich or back-running. A suppressor may be protecting another strategy, overwhelming nearby competition, or exploiting temporary block-level ordering dominance.
 
-For this reason, the report interprets suppression mainly through **gas premium**, **swap concentration**, and **block dominance**, rather than exact realized net profit.
+For that reason, the report interprets suppression mainly through **gas premium**, **swap concentration**, and **block dominance**, rather than exact realized net profit.
 
 #### 4.4.4 Findings
 
@@ -385,7 +385,7 @@ However, the gas-premium signal is extremely strong:
 - Total suppression events: **18**
 - Median gas premium: **20.5×**
 
-The distribution is heavily right-skewed, with a small number of extreme cases pulling the mean far above the median. This suggests that while suppression is uncommon, the cases that do appear are unusually aggressive in terms of gas-price competition.
+The distribution is heavily right-skewed, with a small number of extreme cases pulling the mean far above the median. This suggests that suppression is uncommon, but the observed cases are unusually aggressive in terms of gas-price competition.
 
 Top 5 Suppressors are:
 
@@ -407,17 +407,17 @@ Top 5 Suppressors are:
 
 ## 5. Gas Price Analysis
 
-Gas price is one of the most important on-chain proxies for transaction priority. Since MEV strategies depend heavily on execution order, gas-price behavior provides supporting evidence for strategic bidding and competition within blocks.
+Gas price is one of the most important on-chain proxies for transaction priority. Because MEV strategies depend heavily on execution order, gas-price behavior provides supporting evidence for strategic bidding and competition within blocks.
 
-The gas analysis in this project compares gas-price patterns between suspicious blocks and ordinary blocks, especially for sandwich-related activity. The pair-level comparison shows that suspicious blocks often have noticeably higher median gas prices than normal blocks. This premium is modest in some pairs but extremely large in others, suggesting that the intensity of gas competition differs across markets.
+The gas analysis in this project compares gas-price patterns between suspicious blocks and ordinary blocks, especially for sandwich-related activity. The pair-level comparison shows that suspicious blocks often have noticeably higher median gas prices than normal blocks. This premium is modest in some pairs but extremely large in others, indicating that the intensity of gas competition differs across markets.
 
 From the generated gas chart, the main pattern is clear:
 
 - `WETH_USDC` and `WETH_USDT` show moderate gas premiums in sandwich-related blocks.
 - `WETH_DAI`, `WETH_WBTC`, and `USDC_USDT` show much larger gas premiums.
-- This supports the idea that gas-price competition is an important supporting signal for MEV-related activity, particularly sandwich attacks and suppression-like behavior.
+- This supports the view that gas-price competition is an important supporting signal for MEV-related activity, particularly sandwich attacks and suppression-like behavior.
 
-The gas analysis therefore strengthens the broader interpretation of the detected events. Suspicious ordering patterns are visible not only in transaction sequence, but often also in the gas prices paid to secure priority.
+The gas analysis strengthens the broader interpretation of the detected events. Suspicious ordering patterns appear not only in transaction sequence, but often also in the gas prices paid to secure priority.
 
 ### Figure
 
@@ -427,13 +427,13 @@ The gas analysis therefore strengthens the broader interpretation of the detecte
 
 ---
 
-## 6. Limitation
+## 6. Limitations
 
 This study has several important limitations.
 
 - **On-Chain Visibility Only**
 
-The analysis uses on-chain event data only. Failed, dropped, or replaced mempool transactions are not observable. As a result, the study cannot directly reconstruct the full competition process that happened before final block inclusion.
+The analysis uses on-chain event data only. Failed, dropped, or replaced mempool transactions are not observable. As a result, the study cannot directly reconstruct the full competition process that occurred before final block inclusion.
 
 - **Heuristic Entity Identification**
 
@@ -468,9 +468,9 @@ The report identifies patterns that are strongly consistent with known MEV strat
 
 This project builds a complete workflow for detecting and analyzing MEV-related frontrunning behavior on Uniswap V2 using historical Ethereum mainnet event data. By combining structured swap ordering, heuristic entity identification, and post-analysis of profits and gas prices, the system turns raw event logs into interpretable evidence of suspicious transaction-ordering behavior.
 
-The results show that different MEV patterns exhibit different economic characteristics. Sandwich attacks are less frequent than back-running, but their profitability is concentrated in a relatively small number of events. Displacement frontrunning is better understood as an ordering-advantage pattern supported by gas asymmetry and counterfactual loss estimates, rather than as a clean realized arbitrage payoff. Arbitrage / back-running is the most frequent pattern and contributes the largest aggregate estimated profit. Suppression is rare, but when it appears, it is associated with unusually strong gas-price premiums.
+The four MEV patterns differ clearly in their empirical profile. Sandwich attacks are less frequent than back-running, and their profitability is concentrated in a relatively small share of events. Displacement frontrunning is better interpreted as an ordering-advantage pattern supported by gas asymmetry and counterfactual loss estimates than as a clean realized arbitrage payoff. Arbitrage / back-running is the most frequent pattern and contributes the largest aggregate estimated profit. Suppression is rare, but when it appears, it is associated with unusually strong gas-price premiums.
 
-Overall, the analysis shows that ordered swap data and gas-price behavior together provide a useful basis for studying MEV on AMM-based decentralized exchanges. Although the approach is limited by the absence of mempool visibility and by heuristic assumptions, it remains a practical and reproducible framework for investigating transaction-ordering behavior on Uniswap V2.
+Overall, ordered swap data and gas-price behavior provide a useful basis for studying MEV on AMM-based decentralized exchanges. The approach is constrained by the absence of mempool visibility and by several heuristic assumptions, but it still offers a practical and reproducible framework for investigating transaction-ordering behavior on Uniswap V2.
 
 ## 8. References
 
