@@ -127,11 +127,10 @@ $$
 \mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
 $$
 
-Among these four detection categories, this method provides the most direct profit model, because it can evaluate the round-trip location of the attacker's entire same block in just one calculation.
 
 #### 4.1.4 Findings
 
-A total of **845** sandwich attacks were detected. Among them, the estimated net profit of **179** was positive, that is, the profit cases accounted for about **21.2%** of the total number of sandwiches detected. Overall, the gross profit of these attacks was **$668,920.24**, while the net profit after the cost of natural gas was **$194,984.86**. The average net profit and median per attack were **230.75** and **-23.27**, respectively. These figures show that the profits of sandwiches are obviously uneven, rather than widely distributed. Once the cost of natural gas is included, many of the discovered cases will become very small, even negative, while a group of smaller and profitable events account for a large part of the total benefits.
+A total of **845** sandwich attacks were detected. Among them, the estimated net profit of **179** was positive, that is, the profit cases accounted for about **21.2%** of the total number of sandwiches detected. Overall, the gross profit of these attacks was **668,920.24**, while the net profit after the cost of natural gas was **194,984.86**. The average net profit and median per attack were **230.75** and **-23.27**, respectively. These figures show that the profits of sandwiches are obviously uneven, rather than widely distributed. Once the cost of natural gas is included, many of the discovered cases will become very small, even negative, while a group of smaller and profitable events account for a large part of the total benefits.
 
 Taking a single transaction pair as an example, the number of detected sandwiches is summarised in the following table:
 
@@ -147,17 +146,17 @@ Taking a single transaction pair as an example, the number of detected sandwiche
 
 The following figures help illustrate the sandwich attacks detected in this study.
 
-![Sandwich Timeline](analysis/output/02_sandwich_timeline.png)
+![Sandwich Timeline](analysis/output/02_sandwich_timeline_compact.png)
 
-**Figure 2.** This chart shows the number of sandwich attacks detected each month across the analyzed trading pairs, giving a clear view of their monthly trends.
+**Figure 2.** Monthly sandwich counts across the five analyzed trading pairs.
 
-![Profit Distribution](analysis/output/03_profit_distribution.png)
+![Profit Distribution](analysis/output/03_profit_distribution_compact.png)
 
-**Figure 3.** This figure displays the distribution of estimated net profits from the detected sandwich attacks. It shows that while a few attacks are highly profitable, many earn little or even end up negative after accounting for gas costs.
+**Figure 3.** Distribution of sandwich net profit, showing a strong right tail and many low-profit or negative outcomes after gas costs.
 
-![Top Attackers](analysis/output/04_top_attackers.png)
+![Top Attackers](analysis/output/04_top_attackers_compact.png)
 
-**Figure 4.** Here we see which users carried out the most sandwich attacks and earned the highest total profit.
+**Figure 4.** Top sandwich attackers ranked by event count and total estimated net profit.
 
 
 ### 4.2 Displacement Frontrunning
@@ -250,7 +249,7 @@ This method provides a viable profit estimate to compare the arbitrage opportuni
 
 A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious mode in the data set.
 
-The estimated profits of these events are very considerable. There were a total of 3,593 return transactions, with a total net profit of **$9,895,543.96** and an average net profit of **$2,754.12** per transaction.
+The estimated profits of these events are very considerable. There were a total of 3,593 return transactions, with a total net profit of **9,895,543.96** and an average net profit of **2,754.12** per transaction.
 
 The following is the list of the top five return traders:
 
@@ -339,45 +338,10 @@ Gas analysis enhances the broader interpretation of detected events. Suspicious 
 **Figure 8.** Median gas price in sandwich-related blocks versus normal blocks across the analyzed pairs.
 
 
-## 6. Limitations
-
-This study has several important limitations.
-
-**On-Chain Visibility Only：**
-
-This analysis only uses on-chain event data. Memory pool transactions that have not been successful, discarded or replaced cannot be observed. Therefore, the study cannot directly reproduce the complete competition process that occurred before the final block was included.
-
-**Heuristic Entity Identification：**
-
-The identity of the trader is inferred through the heuristic algorithm based on the router.This method improves the actual classification effect, but it may merge unrelated transactions together or separate activities belonging to the same trader.
-
-**Simplified Gas Model：**
-
-The cost of gas is estimated on the assumption of a fixed consumption of 150,000 units of gas per transaction. The actual gas usage may vary depending on the transaction, so the reported net profit value should be regarded as an estimate, not the exact actual result.
-
-**Price Approximation；**
-
-The valuation of the US dollar depends on the price of ether based on reserves, in which WBTC is converted from the "WETH_WBTC" reserve pool according to the dynamic BTC/ETH ratio to ensure the accuracy of historical data. In order to avoid cyclic pricing in arbitrage profit estimation, the system will use the Ethereum price of the previous block as a pre-impact reference value, but there may be an approximate error during high volatility.
-
-**Threshold Sensitivity：**
-
-These detection rules rely on heuristic thresholds—specifically the **displacement gas ratio (1.5x)**, the **pair-specific 90th percentile arbitrage trigger**, the **suppression gas premium (3x)**, and the **maximum same-block position gaps** for displacement and arbitrage—meaning that any adjustments to these parameters will fluctuate the detection volume and necessitate a recalibration of the balance between **false positives** and **false negatives**.
-
-**Interpretation Caution：**
-
-The report identifies patterns that are strongly consistent with known MEV strategies, but it does not prove malicious intent in every case. Some flagged events may reflect ordinary reactive trading or legitimate high-priority execution rather than explicit predatory behavior.
-
-
-## 7. Conclusion
+## 6. Conclusion
 
 The project uses the historical event data of the Ethereum main network to build a complete workflow for detecting and analyzing advance transaction behaviors related to MEV on Uniswap V2. By combining structured transaction orders, heuristic entity identification, and follow-up analysis of profits and gas prices, the system converts the original event logs into explainable evidence of suspicious transaction order behavior.
 
-These four market effect models have obvious different characteristics: ** arbitrage/reverse follow-up** is the most common and profitable mode; **pinch attack** is rare, but the profit concentration is high; **substitutional early trading** is an order advantage caused by gas differences, not a pure arbitrage behavior; and **suppression** is rare, but has a very high gas premium characteristics.
+These four market effect models have obvious different characteristics: **arbitrage/reverse follow-up** is the most common and profitable mode; **pinch attack** is rare, but the profit concentration is high; **substitutional early trading** is an order advantage caused by gas differences, not a pure arbitrage behavior; and **suppression** is rare, but has a very high gas premium characteristics.
 
 Although there are certain limitations in the transparency of the trading pool and some intuition-based assumptions, the analysis of ordered transaction data and transaction fee behavior provides a reliable and repeatable framework for the study of transaction sequences in Uniswap V2.
-
-## 8. References
-
-[1] Frontrunner jones and the raiders of the dark forest: An empirical study of frontrunning on the ethereum blockchain. Usenix security 2021.
-
-[2] Quantifying Blockchain Extractable Value: How dark is the forest? SP 2022.
