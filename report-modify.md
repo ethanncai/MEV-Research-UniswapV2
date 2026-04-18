@@ -2,32 +2,16 @@
 
 ## 1. Introduction
 
-Maximum Extractable Value (MEV) refers to the additional value that can be captured by influencing transaction ordering during block construction. On automated market maker (AMM) protocols such as Uniswap V2, the outcome of a swap depends not only on pool reserves and trade size, but also on where the transaction appears within the block. Transaction ordering is therefore economically meaningful and creates room for strategies such as frontrunning, back-running, and sandwiching.
-
-This project examines MEV-related behavior on Uniswap V2 using historical Ethereum mainnet event logs. The analysis focuses on five major trading pairs: `WETH_USDC`, `WETH_USDT`, `WETH_DAI`, `WETH_WBTC`, and `USDC_USDT`. Based on structured swap records reconstructed from on-chain event data, the study identifies four suspicious patterns:
-
-- Sandwich attacks
-- Displacement frontrunning
-- Arbitrage / back-running
-- Suppression
-
-The goal is not to infer intent from isolated transactions. Instead, the report develops a reproducible workflow for studying ordering-sensitive behavior on AMM markets. By combining swap ordering, gas-price signals, and profit-related estimates, the analysis evaluates how closely the observed patterns align with known MEV strategies.
+Maximum Extractable Value (MEV) refers to the additional value that can be captured by influencing transaction ordering during block construction. On automated market maker (AMM) protocols such as Uniswap V2, the outcome of a swap depends not only on pool reserves and trade size, but also on where the transaction appears within the block. Transaction ordering is therefore economically meaningful and creates room for strategies such as frontrunning, back-running, and sandwiching. This project examines MEV-related behavior on Uniswap V2 using historical Ethereum mainnet event logs. The analysis focuses on five major trading pairs: WETH_USDC, WETH_USDT, WETH_DAI, WETH_WBTC, and USDC_USDT. Based on structured swap records reconstructed from on-chain event data, the study identifies four suspicious patterns: sandwich attacks, displacement frontrunning, arbitrage / back-running, and suppression. The goal is not to infer intent from isolated transactions. Instead, the report develops a reproducible workflow for studying ordering-sensitive behavior on AMM markets. By combining swap ordering, gas-price signals, and profit-related estimates, the analysis evaluates how closely the observed patterns align with known MEV strategies.
 
 
 ## 2. System Workflow
 
-The analysis is organized as a three-stage pipeline: data loading and preprocessing, MEV pattern detection, and post-analysis.
+The analysis is organized as a four-stage pipeline: data acquisition, data loading and preprocessing, MEV pattern detection, and post-analysis. In the first stage, historical Uniswap V2 Swap and Sync event logs are collected from the Ethereum mainnet for the target trading pairs. In the second stage, the collected data are loaded from pair-specific CSV files, numeric fields are cleaned, transactions are ordered by block position, and trader entities are heuristically identified. In the third stage, the detector scans block-level swap sequences and applies four rule-based heuristics to identify sandwich attacks, displacement frontrunning, arbitrage / back-running, and suppression. In the fourth stage, after detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files. Even without mempool data, this workflow provides a practical basis for comparing suspicious transaction-ordering patterns across major Uniswap V2 pairs. That limitation still matters, but ordered on-chain logs are sufficient to support a meaningful comparative analysis.
 
-1. **Data loading and preprocessing**  
-   Historical Uniswap V2 `Swap` and `Sync` event data are loaded from pair-specific CSV files. Numeric fields are cleaned, transactions are ordered by block position, and trader entities are heuristically identified.
-
-2. **Detection of suspicious transaction-ordering patterns**  
-   The detector scans block-level swap sequences and applies four rule-based heuristics to identify sandwich attacks, displacement frontrunning, arbitrage / back-running, and suppression.
-
-3. **Post-analysis and visualization**  
-   After detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files.
-
-Even without mempool data, this workflow provides a practical basis for comparing suspicious transaction-ordering patterns across major Uniswap V2 pairs. That limitation still matters, but ordered on-chain logs are sufficient to support a meaningful comparative analysis.
+```
+Dataset Crawler  →   4 MEV Detectors  →  Profit Analyzer  →  Charts + Excel
+```
 
 
 ## 3. Data Collection and Processing
