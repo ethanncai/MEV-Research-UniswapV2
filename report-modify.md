@@ -93,27 +93,31 @@ These test results constitute the empirical basis for later discussing profitabi
 
 #### 4.1.1 Intuition
 
-A sandwich attack happens when a single entity trades right before a victim transaction and then trades again immediately after it within the same block. In this scenario, the first trade opens a position, the victim transaction moves the AMM price, and the attacker’s second trade closes the position after that price movement. Essentially, the attacker is trying to profit from the price impact created by the victim’s trade.
+A sandwich attack happens when a single entity trades right before a victim transaction and then trades again immediately after it within the same block. In this scenario, the first trade opens a position, the victim transaction moves the AMM price, and the attacker’s second trade closes the position after that price movement, the attacker is trying to profit from the price impact created by the victim’s trade.
 
 #### 4.1.2 Implementation Logic
 
-In order to detect this attack, the system first finds out the block containing at least three exchange transactions and at least one duplicate user. In each block, the transaction will be grouped by user, and then the algorithm will look for two transactions in opposite directions from the same user. When the same user appears at least twice in the block, and the two transactions are opposite and not the same transaction, it will be marked as a potential sandwich attack. In addition, at least one exchange operation from a different entity must be located between the two exchange operations in the execution order, and the direction of this intermediate exchange operation must be consistent with the direction of the attacker's first transaction. In this way, the classic "front transaction → victim transaction → return transaction" mode can be captured directly from the orderly exchange data.
+To detect this attack, the system needs to find a block containing at least three exchange transactions and at least one duplicate user. In each block, the transaction will be grouped by user, and the algorithm will find two transactions in opposite directions of the same user. 
+
+When the same user appears at least twice in the block, and the two transactions are opposite and not the same transaction, this group of transactions will be marked as a potential sandwich attack. 
+
+In addition, at least one exchange operation from a different entity must be located between the two exchange operations in the execution order, and the direction of this intermediate exchange operation must be consistent with the direction of the attacker's first transaction. In this way, the classic "front transaction → victim transaction → return transaction" mode can be captured directly from the orderly exchange data.
 
 #### 4.1.3 Profit Calculation Logic
 
-For each detected sandwich transaction event, the project will calculate the attacker's net token income in the previous transaction and the next transaction. Suppose that after completing these two transactions, the attacker's net token balance is `net_token0` and `net_token1` respectively. Then, these balances will be converted into US dollars according to the specific valuation rules of the token. The total profit can be expressed as
+For each detected sandwich transaction event, the project will calculate the attacker's net token income in the previous transaction and the next transaction. Then, these balances will be converted into US dollars according to the specific valuation rules of the token. The total profit can be expressed as
 
 $$
 \mathrm{ProfitUSD} = \mathrm{USD}(n_0) + \mathrm{USD}(n_1)
 $$
 
-and the gas cost is estimated using a fixed model of 150,000 gas per swap:
+The gas cost is estimated using a fixed model of 150,000 gas per swap:
 
 $$
 \mathrm{GasCostUSD} = \frac{(g_{\mathrm{front}} + g_{\mathrm{back}}) \times 150000}{10^{18}} \times P_{\mathrm{ETH}}(B)
 $$
 
-Finally, the net profit is calculated by subtracting the gas cost from the gross profit:
+The net profit equals the gross profit minus the gas cost：
 
 $$
 \mathrm{NetProfitUSD} = \mathrm{ProfitUSD} - \mathrm{GasCostUSD}
@@ -122,9 +126,13 @@ $$
 
 #### 4.1.4 Findings
 
-A total of **845** sandwich attacks were detected. Among them, the estimated net profit of **179** was positive, that is, the profit cases accounted for about **21.2%** of the total number of sandwiches detected. Overall, the gross profit of these attacks was **668,920.24**, while the net profit after the cost of natural gas was **194,984.86**. The average net profit and median per attack were **230.75** and **-23.27**, respectively. These figures show that the profits of sandwiches are obviously uneven, rather than widely distributed. Once the cost of natural gas is included, many of the discovered cases will become very small, even negative, while a group of smaller and profitable events account for a large part of the total benefits.
+The project detected **845** sandwich attacks. **179** had an estimated positive net profit, about **21.2%** of all detected attacks. These attacks earned a total gross profit of **668,920.24**. 
 
-Taking a single transaction pair as an example, the number of detected sandwiches is summarised in the following table:
+After accounting for gas costs, the net profit was **194,984.86**. The average net profit per attack was **230.75**, and the median was **-23.27**.
+
+After including gas costs, many cases become very small or negative, while a few profitable events account for most of the gains.
+
+The table below shows sandwich attacks per trading pair.
 
 | Pair | Sandwiches | % Blocks | % Volume |
 |------|-----------|---------|---------|
@@ -136,30 +144,23 @@ Taking a single transaction pair as an example, the number of detected sandwiche
 
 #### 4.1.5 Figures
 
-The following figures help illustrate the sandwich attacks detected in this study.
-
 ![Sandwich Timeline](analysis/output/02_sandwich_timeline_compact.png)
 
 **Figure 2.** Monthly sandwich counts across the five analyzed trading pairs.
 
 ![Profit Distribution](analysis/output/03_profit_distribution_compact.png)
 
-**Figure 3.** Distribution of sandwich net profit, showing a strong right tail and many low-profit or negative outcomes after gas costs.
+**Figure 3.** Sandwich attack net profit distribution
 
 ![Top Attackers](analysis/output/04_top_attackers_compact.png)
 
 **Figure 4.** Top sandwich attackers ranked by event count and total estimated net profit.
 
-
 ### 4.2 Displacement Frontrunning
 
-#### 4.2.1 Intuition
+#### 4.2.1 Implementation Logic
 
-Displacement frontrunning occurs when a trader uses higher gas fees to get their transaction executed before another user’s transaction that is trying to perform a similar trade. By taking priority in the block, the earlier transaction can negatively affect the execution outcome of the later trader, such as causing worse price or higher slippage.
-
-#### 4.2.2 Implementation Logic
-
-The detector will scan each pair of transactions in the same block and mark the displacement event when several conditions are met. First of all, these two transactions must come from different entities, and they must move in the same direction. The first transaction must be executed earlier in the block, which means that its `tx_index` must be strictly smaller than the `tx_index` of the second transaction, and the two transactions should be separated by five positions. In addition, the gas-price ratio of the transaction must meet
+To detect displacement frontrunning, the detector scans each pair of transactions in a block. It checks whether the transactions come from different entities and move in the same direction. The first transaction must occur earlier (tx_index smaller than the second), and the two transactions should be within five positions of each other. Additionally, the gas-price ratio must satisfy
 
 $$
 \frac{g_f}{g_v} \ge 1.5
@@ -169,15 +170,15 @@ where the first transaction is considered the potential frontrunner and the late
 
 It should be noted that this method provides the same block heuristic algorithm, not a direct proof of preemptive trading. Due to the lack of available memory pool data, the detector cannot determine whether the subsequent traders intended to trade first. What it can reveal, however, is a repeated pattern of close-proximity, same-direction trades in which one transaction has a significant gas-price advantage over the other.
 
-#### 4.2.3 Value / Profit Interpretation
+#### 4.2.2 Value / Profit Interpretation
 
-Compared with sandwich attacks, displacement attacks are more difficult to evaluate, because their results depend on a counter-factual problem: how bad is the subsequent transaction because of the loss of priority? Therefore, this report does not regard the displacement profit as a direct profit like a completed sandwich attack.
+This report does not regard the profits of displacement attacks as direct profits like sandwich attacks. Because displacement attacks are more difficult to evaluate than sandwich attacks, their results depend on a hypothetical scenario: how much subsequent transactions will be affected by losing priority.
 
 However, the code does estimate the economic effect of this sorting advantage. It will report several key indicators, including the dollar value of the frontrunner exchange, the dollar value of the victim transaction exchange, the estimated Gas cost of the front transaction, the estimated loss of the victim transaction under the counter-factual benchmark, and the loss extrapolated from it. Estimate the profit signal.
 
-Therefore, it is necessary to be cautious when interpreting these results. Displacement attack is best understood as a ranking advantage model with estimated economic impact, rather than clearly available arbitrage gains.
+Displacement attack is best understood as a ranking advantage model with estimated economic impact, rather than clearly available arbitrage gains.
 
-#### 4.2.4 Findings
+#### 4.2.3 Findings
 
 Judging from the gas ratio statistics, these displacement events show obvious bias. There are a total of **758** incidents, and the median Gas ratio of pre-trades and victim transactions is **3.2×**. The transaction pairs involved include WETH_USDC, WETH_USDT, WETH_DAI, WETH_WBTC and USDC_USDT. There is a big gap between ordinary cases and extreme cases. A few extremely high Gas ratios increase the average, while the median can more stably reflect the typical priority bidding situation of the same block.
 
@@ -192,7 +193,7 @@ The top five displacement front traders are as follows:
 | `0x3fc91a3a…2b7fad` | 21 |
 | `0x80a64c6d…cd5d9e` | 20 |
 
-#### 4.2.5 Figure
+#### 4.2.4 Figure
 
 ![Displacement](analysis/output/07_displacement.png)
 
@@ -213,7 +214,7 @@ $$
 S(t) \ge Q_{0.90}(S)
 $$
 
-For each triggered transaction, the detector will look for subsequent exchanges in the same block and check three conditions: the transaction must belong to a different entity, the transaction direction must be opposite, and it must be completed in the next three transaction positions. If all these conditions are met, the subsequent transaction will be recorded as an arbitrage or back-running event.
+For each triggered transaction, the detector looks at later transactions in the same block. If a transaction comes from a different entity, goes in the opposite direction, and occurs within the next three positions, it is recorded as an arbitrage or back-running event.
 
 This rule aims to capture the transaction behaviour of large transactions that respond immediately, rather than a more complex multi-step arbitrage path. In practical applications, it can highlight traders who respond quickly to price changes in the same block.
 
@@ -233,17 +234,11 @@ $$
 \mathrm{GasCostUSD} = \frac{g_{\mathrm{back}} \times 150000}{10^{18}} \times P_{\mathrm{ETH}}^{\mathrm{pre}}(B)
 $$
 
-Here,$P_{\mathrm{ETH}}^{\mathrm{pre}}(B)$ represents the ETH price of the previous block $B$, which is used as a market reference that is not affected by the current block transaction.
-
-This method provides a viable profit estimate to compare the arbitrage opportunities in different trading pairs.
-
 #### 4.3.4 Findings
 
-A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious mode in the data set.
+A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious pattern in the dataset. The estimated total net profit was **9,895,543.96**, with an average of **2,754.12** per transaction.
 
-The estimated profits of these events are very considerable. There were a total of 3,593 return transactions, with a total net profit of **9,895,543.96** and an average net profit of **2,754.12** per transaction.
-
-The following is the list of the top five return traders:
+The table below shows the top five return traders:
 
 | Entity | Events |
 |--------|--------|
@@ -270,7 +265,7 @@ Suppression refers to a behavior at the block level, in which an entity submits 
 
 #### 4.4.2 Implementation Logic
 
-The detector first calculates the median Gas price of each block. Then, it aggregates the exchange transaction by `(block_number, entity)` and marks it as a suppression candidate event when certain conditions are met. Specifically, if an entity submits at least three exchange transactions in the same block, and the entity's medin Gas price is at least three times the median of the block, it will be considered a candidate event.
+The detector first calculates the median Gas price of each block. Then, it aggregates the exchange transaction by `(block_number, entity)` and marks it as a suppression candidate event when certain conditions are met. 
 
 In the formula, the Gas premium threshold is defined as:
 
@@ -278,7 +273,7 @@ $$
 \mathrm{GasPremium} = \frac{\mathrm{EntityMedianGas}}{\mathrm{BlockMedianGas}} \ge 3.0
 $$
 
-It should be noted that this detector is heuristic. Its purpose is to identify abnormally radical Gas bidding behaviour in the same block, rather than proving that it directly caused the victim's loss in each case.
+This detector's purpose is to identify abnormally radical Gas bidding behaviour in the same block, rather than proving that it directly caused the victim's loss in each case.
 
 #### 4.4.3 Value / Profit Interpretation
 
@@ -288,9 +283,9 @@ Therefore, this report mainly explains the suppression behaviour through **gas p
 
 #### 4.4.4 Findings
 
-Only **18** suppression events were detected in total, making it the least common pattern in the data set. Although the quantity is small, the Gas premium signal is very strong, and the median Gas premium reaches **20.5×**. The distribution is obviously right-biased, and a few extreme events have increased the average, indicating that these inhibition events are extremely radical in Gas price competition.
+There were **18** suppression events in total, which was the rarest pattern in the dataset. The median Gas premium is high at **20.5×**, and a few extreme events raise the average, showing that these events involve very aggressive Gas price competition.
 
-The five most active suppressors in the dataset are shown in the table below:
+The table below lists the five most active suppressors.
 
 | Entity | Events |
 |--------|--------|
