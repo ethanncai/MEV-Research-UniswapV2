@@ -250,7 +250,7 @@ This method provides a viable profit estimate to compare the arbitrage opportuni
 
 A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious mode in the data set.
 
-The estimated profits of these events are very considerable. There were a total of **3,593** return transactions, with a total net profit of **$9,895,543.96** and an average net profit of **$2,754.12** per transaction.
+The estimated profits of these events are very considerable. There were a total of 3,593 return transactions, with a total net profit of **$9,895,543.96** and an average net profit of **$2,754.12** per transaction.
 
 The following is the list of the top five return traders:
 
