@@ -50,4 +50,6 @@ PAIR_CONFIG = {
 }
 
 ESTIMATED_GAS_PER_SWAP = 150_000
-BTC_ETH_RATIO_APPROX = 15.0
+# BTC_ETH_RATIO_APPROX is no longer used — replaced by dynamic ratio
+# from WETH_WBTC pool reserves in data_loader.build_btc_eth_index().
+# The fallback value (15.0) is now hard-coded in analyzers._get_btc_eth_ratio().

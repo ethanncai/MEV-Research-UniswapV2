@@ -13,8 +13,6 @@ This project studies MEV-related behavior on Uniswap V2 using historical Ethereu
 
 The goal of the project is to build a reproducible workflow for MEV-oriented transaction analysis and to evaluate these suspicious behaviors through ordering patterns, gas-price signals, and profit-related estimates.
 
----
-
 ## 2. System Workflow
 
 The system is organized as a three-stage pipeline: data loading and preprocessing, MEV pattern detection, and post-analysis.
@@ -29,8 +27,6 @@ The system is organized as a three-stage pipeline: data loading and preprocessin
    After detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files.
 
 This workflow allows the entire analysis to be reproduced from structured historical event logs without relying on mempool data.
-
----
 
 ## 3. Data Collection and Processing
 
@@ -102,7 +98,6 @@ The final detected output contains:
 
 These outputs form the basis of the later detection analysis and gas-price discussion.
 
----
 
 ## 4. Detection Method
 
@@ -187,7 +182,6 @@ Pair-level sandwich counts are as follows:
 
 **Figure 3.** Top sandwich attackers by event count and cumulative estimated net profit.
 
----
 
 ### 4.2 Displacement Frontrunning
 
@@ -252,7 +246,6 @@ Top 5 Displacement Frontrunners are:
 
 **Figure 4.** Distribution of displacement gas ratios and pair-level event counts.
 
----
 
 ### 4.3 Arbitrage / Back-running
 
@@ -321,7 +314,6 @@ Top 5 Back-runners are:
 
 **Figure 5.** Estimated net-profit distribution and pair-level counts for detected arbitrage / back-running events.
 
----
 
 ### 4.4 Suppression
 
@@ -383,7 +375,6 @@ Top 5 Suppressors are:
 
 **Figure 6.** Gas-premium distribution and pair-level counts for detected suppression events.
 
----
 
 ## 5. Gas Price Analysis
 
@@ -407,7 +398,6 @@ The gas analysis therefore strengthens the interpretation of the detected events
 
 **Figure 7.** Median gas price in sandwich-related blocks versus normal blocks across the analyzed pairs.
 
----
 
 ## 6. Limitation
 
@@ -444,7 +434,6 @@ Changing these thresholds would change the number of detected events and may aff
 
 The report identifies patterns that are strongly consistent with known MEV strategies, but it does not prove malicious intent in every case. Some flagged events may reflect ordinary reactive trading or legitimate high-priority execution rather than explicit predatory behavior.
 
----
 
 ## 7. Conclusion
 

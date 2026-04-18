@@ -96,3 +96,33 @@ def build_eth_price_index(pair_data):
             return price_idx
 
     return pd.Series(dtype=float)
+
+
+def build_btc_eth_index(pair_data):
+    """
+    Build a Series mapping block_number -> BTC/ETH ratio using WETH_WBTC
+    pool reserves.  This replaces the fixed BTC_ETH_RATIO_APPROX constant
+    and gives a historically-accurate conversion for WBTC -> USD.
+
+    BTC/ETH ratio = WETH_reserve / WBTC_reserve  (how many ETH per 1 BTC)
+    """
+    if 'WETH_WBTC' not in pair_data:
+        return pd.Series(dtype=float)
+
+    cfg = PAIR_CONFIG['WETH_WBTC']
+    syncs = pair_data['WETH_WBTC']['syncs'].copy()
+    d0 = cfg['token0_decimals']   # WBTC = 8
+    d1 = cfg['token1_decimals']   # WETH = 18
+
+    r0 = syncs['reserve0'].astype(float) / (10 ** d0)   # WBTC amount
+    r1 = syncs['reserve1'].astype(float) / (10 ** d1)   # WETH amount
+
+    # ratio = WETH per WBTC  (e.g. 15 means 1 BTC ≈ 15 ETH)
+    syncs['btc_eth_ratio'] = np.where(r0 > 0, r1 / r0, np.nan)
+    syncs.dropna(subset=['btc_eth_ratio'], inplace=True)
+
+    ratio_idx = syncs.groupby('block_number')['btc_eth_ratio'].last().sort_index()
+    # Filter obvious outliers
+    ratio_idx = ratio_idx[(ratio_idx > 1) & (ratio_idx < 200)]
+
+    return ratio_idx if len(ratio_idx) > 0 else pd.Series(dtype=float)
