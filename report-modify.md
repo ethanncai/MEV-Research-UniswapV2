@@ -34,7 +34,6 @@ Under key rotation, rate limit and retry control, the whole collection process i
 | `WETH_USDC` | `0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc` |
 | `WETH_USDT` | `0x0d4a11d5EEaaC28EC3F61d100daF4d40471f1852` |
 | `WETH_DAI` | `0xA478c2975Ab1Ea89e8196811F51A7B7Ade33eB11` |
-| `WETH_WBTC` | `0xBb2b8038a1640196FbE3e38816F3e67Cba72D940` |
 | `USDC_USDT` | `0x3041CbD36888bECc7bbCBc0045E3B1f144466f5f` |
 
 The default **maximization** mode starts from near the Uniswap V2 factory deployment (`maximize_from_block: 10000835`) and continues to move towards the tip of the chain, unless a limited `(from_block, to_block)` range is specified in `config.yaml`.
@@ -54,9 +53,9 @@ The project uses four Uniswap V2 event types:
 
 ### 3.2 Entity Identification
 
-Effective transaction entities are defined by heuristics. If the "sender" address is a known Uniswap V2 router, the system uses the "to" address as the actual entity; otherwise, it uses `sender` itself. This does not completely solve the problem of attribution, but it is a reasonable compromise to group the router-mediated exchange under the participants most directly involved in the transaction results.
+Effective transaction entities are defined by heuristics. This does not completely solve the problem of attribution, but it is a reasonable compromise to group the router-mediated exchange under the participants most directly involved in the transaction results.
 
-### 3.3 Transaction Ordering and Direction Assignment
+### 3.3 Transaction Sorting and Direction Allocation
 
 In order to reconstruct the execution order inside each block, the exchange is sorted by `block_number`, `tx_index` and `log_index`. Formally, the order in the block of the transaction is represented as:
 
@@ -64,11 +63,11 @@ $$
 \mathrm{ord}(x) = (\mathrm{txIndex}_x,\ \mathrm{logIndex}_x)
 $$
 
-This sorting is the core of the analysis, because each detection rule depends on the relative position of the exchange operation in the same piece.
+The sorting is the main part of the analysis, because every detection rule depends on the relative position of the exchange operation in the same piece.
 
 
 
-For each exchange, we will specify a binary direction:
+For every exchange, we clearly state a binary direction:
 
 `direction = 0`: token0 flows to pair
 
@@ -78,15 +77,15 @@ When the input end is clear, the direction can be inferred directly from the non
 
 ### 3.4 Price Reconstruction and Valuation Setup
 
-In order to estimate profits in US dollars, the project established a historical ETH price index based on Uniswap V2 reserves. It first uses `WETH_USDC` to retain data. If this pair is not available, go back to `WETH_USDT`, and then `WETH_DAI`.
+To estimate profits in US dollars, we set a historical ETH price index based on Uniswap V2 reserves. It first uses `WETH_USDC` to retain data. If this pair is not available, go back to `WETH_USDT`, and then `WETH_DAI`.
 
 Stablecoins such as `USDC`, `USDT` and ``DAI` are directly regarded as dollar-denomination assets. 'WETH` uses the reconstructed ETH price sequence for conversion. WBTC" is valued by the dynamic BTC/ETH ratio derived from the "WETH_WBTC" pool reserves, which is more suitable for historical analysis than using fixed approximation.
 
 ### 3.5 Output Summary
 
-Before the detector is executed, the crawler will generate the following event-level records:  **Sync**: 1,349,490；**Swap**: 1,315,097；**Mint**: 13,381；**Burn**: 12,505；**Total**: **2,690,473**
+Before the detector is executed, the crawler will generate the following records:  **Sync**: 1,349,490；**Swap**: 1,315,097；**Mint**: 13,381；**Burn**: 12,505；**Total**: **2,690,473**.
 
-The subsequent detector output contains: **845** sandwich events；**758** displacement events；**3,593** arbitrage / back-running events；**18** suppression events
+The output results of the detectors include: **845** interlayer events; **845** sandwich events；**758** displacement events；**3,593** arbitrage / back-running events；**18** suppression events.
 
 ![Frontrun Overview](analysis/output/01_frontrun_overview.png)
 
