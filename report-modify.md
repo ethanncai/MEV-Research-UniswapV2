@@ -50,12 +50,7 @@ The project uses four Uniswap V2 event types:
 
 **Burn**: Record the removal of liquidity.
 
-
-### 3.2 Entity Identification
-
-Effective transaction entities are defined by heuristics. This does not completely solve the problem of attribution, but it is a reasonable compromise to group the router-mediated exchange under the participants most directly involved in the transaction results.
-
-### 3.3 Transaction Sorting and Direction Allocation
+### 3.2 Transaction Sorting and Direction Allocation
 
 In order to reconstruct the execution order inside each block, the exchange is sorted by `block_number`, `tx_index` and `log_index`. Formally, the order in the block of the transaction is represented as:
 
@@ -65,8 +60,6 @@ $$
 
 The sorting is the main part of the analysis, because every detection rule depends on the relative position of the exchange operation in the same piece.
 
-
-
 For every exchange, we clearly state a binary direction:
 
 `direction = 0`: token0 flows to pair
@@ -75,13 +68,13 @@ For every exchange, we clearly state a binary direction:
 
 When the input end is clear, the direction can be inferred directly from the non-zero input field. Otherwise, compare the decimal normalized mark input so that different mark units will not distort the directional distribution.
 
-### 3.4 Price Reconstruction and Valuation Setup
+### 3.3 Price Reconstruction and Valuation Setup
 
 To estimate profits in US dollars, we set a historical ETH price index based on Uniswap V2 reserves. It first uses `WETH_USDC` to retain data. If this pair is not available, go back to `WETH_USDT`, and then `WETH_DAI`.
 
 Stablecoins such as `USDC`, `USDT` and ``DAI` are directly regarded as dollar-denomination assets. 'WETH` uses the reconstructed ETH price sequence for conversion. WBTC" is valued by the dynamic BTC/ETH ratio derived from the "WETH_WBTC" pool reserves, which is more suitable for historical analysis than using fixed approximation.
 
-### 3.5 Output Summary
+### 3.4 Output Summary
 
 Before the detector is executed, the crawler will generate the following records:  **Sync**: 1,349,490；**Swap**: 1,315,097；**Mint**: 13,381；**Burn**: 12,505；**Total**: **2,690,473**.
 
