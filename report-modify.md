@@ -7,7 +7,7 @@ Maximum Extractable Value (MEV) refers to the additional value that can be captu
 
 ## 2. System Workflow
 
-The analysis is organized as a four-stage pipeline: data acquisition, data loading and preprocessing, MEV pattern detection, and post-analysis. In the first stage, historical Uniswap V2 Swap and Sync event logs are collected from the Ethereum mainnet for the target trading pairs. In the second stage, the collected data are loaded from pair-specific CSV files, numeric fields are cleaned, transactions are ordered by block position, and trader entities are heuristically identified. In the third stage, the detector scans block-level swap sequences and applies four rule-based heuristics to identify sandwich attacks, displacement frontrunning, arbitrage / back-running, and suppression. In the fourth stage, after detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files. Even without mempool data, this workflow provides a practical basis for comparing suspicious transaction-ordering patterns across major Uniswap V2 pairs. That limitation still matters, but ordered on-chain logs are sufficient to support a meaningful comparative analysis.
+There are four stages in whole process, including data acquisition, data loading and preprocessing, MEV pattern detection, and post-analysis. Firstly, historical UniswaSwap V2 swap and V2 sync event logs are obtained from the Ethereum mains network for the target trading pairs. In addition, the collected data are loaded from pair-specific CSV files, numeric fields are cleaned, transactions are ordered by block position, and trader entities are heuristically identified. Next, the detector scans block-level swap sequences and applies four rule-based heuristics to identify whether containing four attacks. Finally, after detection, the system estimates profits where possible, analyzes gas-price behavior, summarizes pair-level statistics, and generates charts and export files. Even without mempool data, this workflow provides a practical basis for comparing suspicious transaction-ordering patterns across major Uniswap V2 pairs. That limitation still matters, but ordered on-chain logs are sufficient to support a meaningful comparative analysis.
 
 ```
 Dataset Crawler  →   4 MEV Detectors  →  Profit Analyzer  →  Charts + Excel
@@ -58,9 +58,7 @@ $$
 \mathrm{ord}(x) = (\mathrm{txIndex}_x,\ \mathrm{logIndex}_x)
 $$
 
-The sorting is the main part of the analysis, because every detection rule depends on the relative position of the exchange operation in the same piece.
-
-For every exchange, we clearly state a binary direction:
+Every detection rule depends on the relative position of the exchange operation in the same piece.For every exchange, we clearly state a binary direction:
 
 `direction = 0`: token0 flows to pair
 
@@ -70,22 +68,15 @@ When the input end is clear, the direction can be inferred directly from the non
 
 ### 3.3 Price Reconstruction and Valuation Setup
 
-To estimate profits in US dollars, we set a historical ETH price index based on Uniswap V2 reserves. It first uses `WETH_USDC` to retain data. If this pair is not available, go back to `WETH_USDT`, and then `WETH_DAI`.
-
-Stablecoins such as `USDC`, `USDT` and ``DAI` are directly regarded as dollar-denomination assets. 'WETH` uses the reconstructed ETH price sequence for conversion. WBTC" is valued by the dynamic BTC/ETH ratio derived from the "WETH_WBTC" pool reserves, which is more suitable for historical analysis than using fixed approximation.
+Based on the reserve of Uniswap V2, we have set up a historical price index for Ethereum to evaluate the benefits. Stablecoins such as `USDC`, `USDT` and ``DAI` are directly regarded as dollar-denomination assets. 'WETH` uses the reconstructed ETH price sequence for conversion. WBTC" is valued by the dynamic BTC/ETH ratio derived from the "WETH_WBTC" pool reserves, which is more suitable for historical analysis than using fixed approximation.
 
 ### 3.4 Output Summary
-
-Before the detector is executed, the crawler will generate the following records:  **Sync**: 1,349,490；**Swap**: 1,315,097；**Mint**: 13,381；**Burn**: 12,505；**Total**: **2,690,473**.
 
 The output results of the detectors include: **845** interlayer events; **845** sandwich events；**758** displacement events；**3,593** arbitrage / back-running events；**18** suppression events.
 
 ![Frontrun Overview](analysis/output/01_frontrun_overview.png)
 
 **Figure 1.** Detected frontrunning activities by type and trading pair.
-
-These test results constitute the empirical basis for later discussing profitability, gasoline price behavior and cross-differences.
-
 
 ## 4. Detection Method
 
@@ -97,9 +88,7 @@ A sandwich attack happens when a single entity trades right before a victim tran
 
 #### 4.1.2 Implementation Logic
 
-To detect this attack, the system needs to find a block containing at least three exchange transactions and at least one duplicate user. In each block, the transaction will be grouped by user, and the algorithm will find two transactions in opposite directions of the same user. 
-
-When the same user appears at least twice in the block, and the two transactions are opposite and not the same transaction, this group of transactions will be marked as a potential sandwich attack. 
+The logic is that finding a block containing at least three exchange transactions and at least one duplicate user for detecting the sandwich attack. In each block, the transaction will be grouped by user, and the algorithm will find two transactions in opposite directions of the same user. Transactions will be considered as a sandwich attack when the same user participant at least twice in the block and the two transactions are opposite.
 
 In addition, at least one exchange operation from a different entity must be located between the two exchange operations in the execution order, and the direction of this intermediate exchange operation must be consistent with the direction of the attacker's first transaction. In this way, the classic "front transaction → victim transaction → return transaction" mode can be captured directly from the orderly exchange data.
 
@@ -126,13 +115,7 @@ $$
 
 #### 4.1.4 Findings
 
-The project detected **845** sandwich attacks. **179** had an estimated positive net profit, about **21.2%** of all detected attacks. These attacks earned a total gross profit of **668,920.24**. 
-
-After accounting for gas costs, the net profit was **194,984.86**. The average net profit per attack was **230.75**, and the median was **-23.27**.
-
-After including gas costs, many cases become very small or negative, while a few profitable events account for most of the gains.
-
-The table below shows sandwich attacks per trading pair.
+ **845** sandwich attacks are detected as you can see. Specially, **179** had an estimated positive net profit, about **21.2%** of all detected attacks and total attacks earned a total gross profit of **668,920.24**. Interestingly, Many cases have less or negative profits as gas costs. The table below shows sandwich attacks per trading pair.
 
 | Pair | Sandwiches | % Blocks | % Volume |
 |------|-----------|---------|---------|
@@ -160,8 +143,7 @@ The table below shows sandwich attacks per trading pair.
 
 #### 4.2.1 Implementation Logic
 
-To detect displacement frontrunning, the detector scans each pair of transactions in a block. It checks whether the transactions come from different entities and move in the same direction. The first transaction must occur earlier (tx_index smaller than the second), and the two transactions should be within five positions of each other. Additionally, the gas-price ratio must satisfy
-
+The detector scans each pair of transactions in a block, which checks whether the transactions come from different entities and move in the same direction. The first transaction must occur earlier (tx_index smaller than the second), and the two transactions should be within five positions of each other. Additionally, the gas-price ratio must satisfy: 
 $$
 \frac{g_f}{g_v} \ge 1.5
 $$
@@ -236,7 +218,7 @@ $$
 
 #### 4.3.4 Findings
 
-A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious pattern in the dataset. The estimated total net profit was **9,895,543.96**, with an average of **2,754.12** per transaction.
+A total of **3,593** arbitrage/back-running events were detected, making it the most frequent suspicious pattern in the dataset. Total net profit is **9,895,543.96**, with the average profit of per transaction that is  **2,754.12**.
 
 The table below shows the top five return traders:
 
@@ -277,13 +259,13 @@ This detector's purpose is to identify abnormally radical Gas bidding behaviour 
 
 #### 4.4.3 Value / Profit Interpretation
 
-Suppression cannot directly recover the achievable net profit formula by exchanging logs alone. Therefore, its economic effect is more indirect than sandwich attacks or reposition transactions. The entity that implements suppression may be protecting other strategies, suppressing nearby competitors, or taking advantage of short-term block-level sorting advantages.
+Suppression cannot directly recover the achievable net profit formula by exchanging logs alone so that the economic effect is more indirect than sandwich attacks or reposition transactions. The entity that implements suppression may be protecting other strategies, suppressing nearby competitors, or taking advantage of short-term block-level sorting advantages.
 
 Therefore, this report mainly explains the suppression behaviour through **gas premium**, **swap concentration**, and **block dominance**, rather than through precise realised net profits.
 
 #### 4.4.4 Findings
 
-There were **18** suppression events in total, which was the rarest pattern in the dataset. The median Gas premium is high at **20.5×**, and a few extreme events raise the average, showing that these events involve very aggressive Gas price competition.
+ The median Gas premium is high at **20.5×**, and a few extreme events raise the average, showing that these events involve very aggressive gas price competition.
 
 The table below lists the five most active suppressors.
 
@@ -304,19 +286,11 @@ The table below lists the five most active suppressors.
 
 ## 5. Gas Price Analysis
 
-Natural gas price is one of the most important priority indicators for on-chain transactions. Since the MEV strategy largely depends on the order of execution, natural gas price behavior provides supporting evidence for strategic bidding and intra-block competition.
+Natural gas price is one of the most important priority indicators for on-chain transactions. Since the MEV strategy largely depends on the order of execution, natural gas price behavior provides supporting evidence for strategic bidding and intra-block competition. In this project, the analysis of natural gas prices compared the gas price patterns in the suspect areas and the normal areas, particularly regarding activities related to sandwiches. Through a 2:2 comparison, it was found that the median gas price in the suspect areas was typically significantly higher than that in the normal areas.This premium is moderate in some pairs, but very large in others, indicating the intensity of natural gas competition in different markets.
 
-In this project, the analysis of natural gas prices compared the gas price patterns in the suspect areas and the normal areas, particularly regarding activities related to sandwiches. Through a 2:2 comparison, it was found that the median gas price in the suspect areas was typically significantly higher than that in the normal areas.This premium is moderate in some pairs, but very large in others, indicating the intensity of natural gas competition in different markets.
-
-Judging from the generated gas diagram, the main mode is very clear:
-
-"WETH_USDC" and "WETH_USDT" show a slight increase in the price of natural gas in sandwich-related blocks.
-
-`WETH_DAI`, `WETH_WBTC` and `USDC_USDT` show a greater natural gas premium.
+`WETH_USDC` and `WETH_USDT` show a slight increase in the price of natural gas in sandwich-related blocks. `WETH_DAI`, `WETH_WBTC` and `USDC_USDT` show a greater natural gas premium.
 
 This supports the view that natural gas price competition is an important support signal for mev-related activities, especially sandwich attacks and similar suppression behaviors.
-
-Gas analysis enhances the broader interpretation of detected events. Suspicious transaction patterns not only occur during the transaction process, but also frequently appear in the gas prices paid to suppliers, with the aim of ensuring priority supply rights.
 
 ### Figure
 
