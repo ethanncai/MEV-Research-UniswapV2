@@ -68,7 +68,7 @@ When the input end is clear, the direction can be inferred directly from the non
 
 ### 3.3 Price Reconstruction and Valuation Setup
 
-Based on the reserve of Uniswap V2, we have set up a historical price index for Ethereum to evaluate the benefits. Stablecoins such as `USDC`, `USDT` and ``DAI` are directly regarded as dollar-denomination assets. 'WETH` uses the reconstructed ETH price sequence for conversion. WBTC" is valued by the dynamic BTC/ETH ratio derived from the "WETH_WBTC" pool reserves, which is more suitable for historical analysis than using fixed approximation.
+Based on the reserve of Uniswap V2, we have set up a historical price index for Ethereum to evaluate the benefits. Stablecoins such as `USDC`, `USDT` and `DAI` are directly regarded as dollar-denomination assets. `WETH` uses the reconstructed ETH price sequence for conversion. `WBTC` is valued by the dynamic BTC/ETH ratio derived from the`WETH_WBTC` pool reserves, which is more suitable for historical analysis than using fixed approximation.
 
 ### 3.4 Output Summary
 
