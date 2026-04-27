@@ -8,7 +8,7 @@ import sys
 import time
 
 from config import OUTPUT_DIR
-from data_loader import load_all_pairs, build_eth_price_index
+from data_loader import load_all_pairs, build_eth_price_index, build_btc_eth_index
 from detectors import (detect_sandwiches, detect_displacement,
                        detect_arbitrage, detect_suppression, detect_gas_anomalies)
 from analyzers import (calculate_sandwich_profits, calculate_displacement_profits,
@@ -36,13 +36,20 @@ def main():
         sys.exit(1)
 
     # ---- 2. ETH price index ----
-    print('\n[2/5] Building ETH price index ...')
+    print('\n[2/5] Building price indices ...')
     eth_price_idx = build_eth_price_index(pair_data)
     if eth_price_idx.empty:
         print('  Warning: Could not build ETH price index; using fallback.')
     else:
-        print(f'  {len(eth_price_idx):,} data points, '
+        print(f'  ETH/USD: {len(eth_price_idx):,} data points, '
               f'range ${eth_price_idx.min():,.0f} – ${eth_price_idx.max():,.0f}')
+
+    btc_eth_idx = build_btc_eth_index(pair_data)
+    if btc_eth_idx.empty:
+        print('  Warning: Could not build BTC/ETH index; using fallback ratio 15.0.')
+    else:
+        print(f'  BTC/ETH: {len(btc_eth_idx):,} data points, '
+              f'range {btc_eth_idx.min():.1f} – {btc_eth_idx.max():.1f}')
 
     # ---- 3. Detect all frontrunning types ----
     print('\n[3/5] Detecting frontrunning activities ...')
@@ -97,13 +104,16 @@ def main():
 
     # ---- 4. Analyse profits ----
     print('\n[4/5] Analysing profits and market impact ...')
-    sandwiches_df = calculate_sandwich_profits(sandwiches_df, eth_price_idx)
-    disp_df       = calculate_displacement_profits(disp_df, eth_price_idx)
-    arb_df        = calculate_arbitrage_profits(arb_df, eth_price_idx)
+    sandwiches_df = calculate_sandwich_profits(sandwiches_df, eth_price_idx, btc_eth_idx)
+    disp_df       = calculate_displacement_profits(disp_df, eth_price_idx, btc_eth_idx, pair_data)
+    arb_df        = calculate_arbitrage_profits(arb_df, eth_price_idx, btc_eth_idx)
     market_impact = analyze_market_impact(sandwiches_df, pair_data)
 
     if not sandwiches_df.empty and 'net_profit_usd' in sandwiches_df.columns:
         print(f'  Sandwich net profit:   ${sandwiches_df["net_profit_usd"].sum():,.2f}')
+    if not disp_df.empty and 'victim_loss_usd' in disp_df.columns:
+        print(f'  Displacement victim loss: ${disp_df["victim_loss_usd"].sum():,.2f}')
+        print(f'  Displacement est. profit: ${disp_df["estimated_profit_usd"].sum():,.2f}')
     if not arb_df.empty and 'net_profit_usd' in arb_df.columns:
         print(f'  Arbitrage net profit:  ${arb_df["net_profit_usd"].sum():,.2f}')
 
